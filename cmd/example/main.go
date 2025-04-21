@@ -6,10 +6,6 @@ import (
 	"log/slog"
 	"os"
 
-	"fmt"
-	"log/slog"
-	"os"
-
 	"github.com/caasmo/restinpieces"
 	rip_queue "github.com/caasmo/restinpieces/queue"
 
