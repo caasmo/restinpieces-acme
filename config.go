@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog" // Use slog for logging
-	"os"       // For potential future env var loading
 )
 
 // Config holds settings specifically for the certificate renewal process.

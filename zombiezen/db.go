@@ -1,4 +1,4 @@
-package zombiezen 
+package zombiezen
 
 import (
 	"context"
@@ -58,4 +58,3 @@ func (d *Db) AddCert(cert acme.Cert) error { // Use acme.Cert
 }
 
 // Remove or comment out old Get() and Save() methods if they existed here.
-

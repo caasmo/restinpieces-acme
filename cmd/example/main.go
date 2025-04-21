@@ -10,11 +10,11 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/caasmo/restinpieces"        
-	rip_queue "github.com/caasmo/restinpieces/queue" 
+	"github.com/caasmo/restinpieces"
+	rip_queue "github.com/caasmo/restinpieces/queue"
 
-	"github.com/caasmo/restinpieces-acme"         
-	acme_db "github.com/caasmo/restinpieces-acme/zombiezen" 
+	"github.com/caasmo/restinpieces-acme"
+	acme_db "github.com/caasmo/restinpieces-acme/zombiezen"
 )
 
 // Define job type constant for clarity
@@ -76,7 +76,7 @@ func main() {
 	// --- Initialize restinpieces Framework ---
 	// Pass ageKeyPath as the first argument
 	app, srv, err := restinpieces.New(
-		*ageKeyPath, // Framework needs this for its own config
+		*ageKeyPath,                          // Framework needs this for its own config
 		restinpieces.WithDbZombiezen(dbPool), // Provide the pool to the framework
 		restinpieces.WithRouterServeMux(),
 		restinpieces.WithCacheRistretto(),
