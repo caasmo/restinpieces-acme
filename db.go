@@ -1,10 +1,9 @@
 package acme // Or root package of your module
 
-import "github.com/caasmo/restinpieces-acme" // Import the root acme package
-
 // Writer defines the interface for storing certificate history records.
+// Types like Cert are available directly as they are in the same package.
 type Writer interface {
 	// AddCert adds a new certificate record to the database history.
-	AddCert(cert acme.Cert) error // Use acme.Cert
-	// Potentially add: GetLatestByIdentifier(identifier string) (*acme.Cert, error)
+	AddCert(cert Cert) error // Use Cert directly
+	// Potentially add: GetLatestByIdentifier(identifier string) (*Cert, error)
 }
