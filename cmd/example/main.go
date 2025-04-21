@@ -6,14 +6,26 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/caasmo/restinpieces"
+	"fmt"
+	"log/slog"
+	"os"
+
+	"github.com/caasmo/restinpieces"        // The core framework
+	rip_queue "github.com/caasmo/restinpieces/queue" // Framework queue types
+
+	// Imports for our ACME package (adjust paths according to your module structure)
+	"github.com/your-org/restinpieces-acme"           // Root package (Config, Writer interface, Handler)
+	acme_db "github.com/your-org/restinpieces-acme/zombiezen" // Concrete DB implementation
 )
+
+// Define job type constant for clarity
+const JobTypeCertRenewal = "certificate_renewal"
 
 // Pool creation helpers moved to restinpieces package
 
 func main() {
-	// Define flags directly in main
-	dbPath := flag.String("db", "", "Path to the SQLite database file (required)")
+	// --- Framework Flags ---
+	dbPath := flag.String("db", "", "Path to the SQLite DB (used by framework AND acme history)")
 	ageKeyPath := flag.String("age-key", "", "Path to the age identity (private key) file (required)")
 
 	// Set custom usage message for the application
@@ -34,15 +46,27 @@ func main() {
 	}
 
 	// --- Create the Database Pool ---
+	// --- Load ACME Renewal Config (Hardcoded for now) ---
+	// This loads the configuration specific to the ACME renewal process.
+	renewalCfg, err := acme.LoadConfig() // Load config from acme package
+	if err != nil {
+		slog.Error("Failed to load ACME renewal configuration", "error", err)
+		os.Exit(1)
+	}
+	// Optional: Check renewalCfg.Enabled early if you want to avoid setting up DB etc.
+	// if !renewalCfg.Enabled {
+	//     slog.Info("ACME renewal is disabled via configuration. Exiting.")
+	//     os.Exit(0)
+	// }
+
+	// --- Create Database Pool (Shared by framework and ACME history) ---
 	// Use the helper from the library to create a pool with suitable defaults.
-	//dbPool, err := restinpieces.NewCrawshawPool(*dbPath) // Use dbPath
 	dbPool, err := restinpieces.NewZombiezenPool(*dbPath) // Use dbPath
 	if err != nil {
-		slog.Error("failed to create database pool", "error", err)
+		slog.Error("failed to create database pool", "path", *dbPath, "error", err)
 		os.Exit(1) // Exit if pool creation fails
 	}
 	// Defer closing the pool here, as main owns it now.
-	// This must happen *after* the server finishes.
 	defer func() {
 		slog.Info("Closing database pool...")
 		if err := dbPool.Close(); err != nil {
@@ -50,27 +74,52 @@ func main() {
 		}
 	}()
 
-	// --- Initialize the Application ---
+	// --- Initialize restinpieces Framework ---
 	// Pass ageKeyPath as the first argument
-	_, srv, err := restinpieces.New(
-		*ageKeyPath, // Pass the age key file path
-		restinpieces.WithDbZombiezen(dbPool),
-		//restinpieces.WithDbCrawshaw(dbPool),
+	app, srv, err := restinpieces.New(
+		*ageKeyPath, // Framework needs this for its own config
+		restinpieces.WithDbZombiezen(dbPool), // Provide the pool to the framework
 		restinpieces.WithRouterServeMux(),
 		restinpieces.WithCacheRistretto(),
-		restinpieces.WithTextLogger(nil),
+		restinpieces.WithTextLogger(nil), // Use default text logger
 	)
 	if err != nil {
-		slog.Error("failed to initialize application", "error", err)
+		slog.Error("failed to initialize restinpieces application", "error", err)
 		// Pool will be closed by the deferred function
 		os.Exit(1) // Exit if app initialization fails
 	}
 
-	// PreRouter initialization is now handled internally within restinpieces.New / initPreRouter
+	// --- Setup ACME Dependencies ---
+	// Create the DbWriter implementation instance using the shared pool
+	certDbWriter := acme_db.NewWriter(dbPool)
+	frameworkLogger := app.Logger() // Get logger from framework for consistency
 
-	// Start the server
-	// The Run method likely blocks until the server stops (e.g., via signal)
-	// It will now use the handler set via app.SetPreRouter()
+	// --- Instantiate and Register ACME Handler ---
+	// Only register the handler if ACME renewal is enabled in its specific config.
+	if renewalCfg.Enabled {
+		certHandler := acme.NewCertRenewalHandler(renewalCfg, certDbWriter, frameworkLogger)
+
+		// Register the handler with the framework's server instance
+		err = srv.AddJobHandler(JobTypeCertRenewal, certHandler)
+		if err != nil {
+			frameworkLogger.Error("Failed to register certificate renewal job handler", "job_type", JobTypeCertRenewal, "error", err)
+			os.Exit(1)
+		}
+		frameworkLogger.Info("Registered certificate renewal job handler", "job_type", JobTypeCertRenewal)
+	} else {
+		frameworkLogger.Info("ACME renewal handler not registered (disabled in its config)")
+	}
+
+	// PreRouter initialization is handled internally within restinpieces.New
+
+	// --- Start Server ---
+	// The Run method blocks until the server stops (e.g., via signal).
+	// It manages the lifecycle of registered daemons (like the scheduler).
+	// Reminder: This setup registers the handler, but doesn't automatically
+	// schedule the JobTypeCertRenewal job. That needs a separate mechanism:
+	// - A manual trigger (API call, CLI command to enqueue the job)
+	// - A dedicated scheduler daemon added via srv.AddDaemon()
+	// - Integration with an external scheduler.
 	srv.Run()
 
 	slog.Info("Server shut down gracefully.")
