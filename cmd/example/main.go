@@ -101,6 +101,12 @@ func main() {
 			os.Exit(1)
 		}
 		frameworkLogger.Info("Registered certificate renewal job handler", "job_type", JobTypeCertRenewal)
+
+		// Reminder: This setup registers the handler, but doesn't automatically
+		// schedule the JobTypeCertRenewal job. That needs a separate mechanism:
+		// - A manual trigger (API call, CLI command to enqueue the job)
+		// - A dedicated scheduler daemon added via srv.AddDaemon()
+		// - Integration with an external scheduler.
 	} else {
 		frameworkLogger.Info("ACME renewal handler not registered (disabled in its config)")
 	}
@@ -110,11 +116,6 @@ func main() {
 	// --- Start Server ---
 	// The Run method blocks until the server stops (e.g., via signal).
 	// It manages the lifecycle of registered daemons (like the scheduler).
-	// Reminder: This setup registers the handler, but doesn't automatically
-	// schedule the JobTypeCertRenewal job. That needs a separate mechanism:
-	// - A manual trigger (API call, CLI command to enqueue the job)
-	// - A dedicated scheduler daemon added via srv.AddDaemon()
-	// - Integration with an external scheduler.
 	srv.Run()
 
 	slog.Info("Server shut down gracefully.")
