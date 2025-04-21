@@ -5,7 +5,6 @@ import (
 	"fmt"
 	// Adjust import path according to your module structure
 	"github.com/caasmo/restinpieces-acme" // Import the root acme package
-	"zombiezen.com/go/sqlite"             // Keep sqlite import if needed for other funcs
 	"zombiezen.com/go/sqlite/sqlitex"
 )
 
