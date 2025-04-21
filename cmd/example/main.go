@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/caasmo/restinpieces"
-	rip_queue "github.com/caasmo/restinpieces/queue"
+	// rip_queue "github.com/caasmo/restinpieces/queue" // Removed unused import
 
 	"github.com/caasmo/restinpieces-acme"
 	acme_db "github.com/caasmo/restinpieces-acme/zombiezen"
