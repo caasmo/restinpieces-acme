@@ -10,6 +10,9 @@ import (
 	"log/slog"
 	"time"
 
+	// Use types from this package directly
+	// "github.com/caasmo/restinpieces-acme" // No need to import self
+
 	// Framework queue types
 	rip_queue "github.com/caasmo/restinpieces/queue"
 
@@ -176,8 +179,8 @@ func (h *CertRenewalHandler) saveCertificateHistory(resource *certificate.Resour
 		return err
 	}
 
-	// 3. Create the types.Cert struct for database insertion
-	dbCert := types.Cert{
+	// 3. Create the Cert struct for database insertion (use directly)
+	dbCert := Cert{
 		Identifier:       resource.Domain, // Use primary domain from resource as identifier
 		Domains:          string(domainsJSON),
 		CertificateChain: string(resource.Certificate), // Full PEM chain

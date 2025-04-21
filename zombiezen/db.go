@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 	// Adjust import path according to your module structure
-	// Assuming your module path is github.com/your-org/restinpieces-acme
-	"github.com/your-org/restinpieces-acme/types"
-	"zombiezen.com/go/sqlite" // Keep sqlite import if needed for other funcs
+	"github.com/caasmo/restinpieces-acme" // Import the root acme package
+	"zombiezen.com/go/sqlite"             // Keep sqlite import if needed for other funcs
 	"zombiezen.com/go/sqlite/sqlitex"
 )
 
@@ -26,7 +25,7 @@ func NewWriter(pool *sqlitex.Pool) *Db {
 }
 
 // AddCert adds a new certificate record to the 'certificates' table.
-func (d *Db) AddCert(cert types.Cert) error {
+func (d *Db) AddCert(cert acme.Cert) error { // Use acme.Cert
 	conn, err := d.pool.Take(context.TODO()) // Use appropriate context
 	if err != nil {
 		// Consider adding more context, like the identifier, if available and useful
@@ -46,8 +45,8 @@ func (d *Db) AddCert(cert types.Cert) error {
 				cert.Domains,
 				cert.CertificateChain,
 				cert.PrivateKey,
-				types.TimeFormat(cert.IssuedAt),  // Use formatter from types package
-				types.TimeFormat(cert.ExpiresAt), // Use formatter from types package
+				acme.TimeFormat(cert.IssuedAt),  // Use acme.TimeFormat
+				acme.TimeFormat(cert.ExpiresAt), // Use acme.TimeFormat
 			},
 		})
 
