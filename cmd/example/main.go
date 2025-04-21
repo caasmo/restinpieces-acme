@@ -10,12 +10,11 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/caasmo/restinpieces"        // The core framework
-	rip_queue "github.com/caasmo/restinpieces/queue" // Framework queue types
+	"github.com/caasmo/restinpieces"        
+	rip_queue "github.com/caasmo/restinpieces/queue" 
 
-	// Imports for our ACME package (adjust paths according to your module structure)
-	"github.com/your-org/restinpieces-acme"           // Root package (Config, Writer interface, Handler)
-	acme_db "github.com/your-org/restinpieces-acme/zombiezen" // Concrete DB implementation
+	"github.com/caasmo/restinpieces-acme"         
+	acme_db "github.com/caasmo/restinpieces-acme/zombiezen" 
 )
 
 // Define job type constant for clarity

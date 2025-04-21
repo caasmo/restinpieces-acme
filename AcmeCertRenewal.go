@@ -10,9 +10,6 @@ import (
 	"log/slog"
 	"time"
 
-	// Use types from this package (or sibling)
-	"github.com/your-org/restinpieces-acme/types" // Adjust import path
-
 	// Framework queue types
 	rip_queue "github.com/caasmo/restinpieces/queue"
 
