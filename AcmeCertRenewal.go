@@ -20,6 +20,12 @@ import (
 	"github.com/go-acme/lego/v4/registration"
 )
 
+// --- Constants ---
+const (
+	DNSProviderCloudflare = "cloudflare"
+	// Add constants for other supported providers here
+)
+
 // --- Configuration Structs ---
 
 type DNSProvider struct {
@@ -94,10 +100,10 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 	}
 
 	// --- DNS Provider Setup (using cfg.DNSProviders map) ---
-	// This example assumes only one provider ("cloudflare") is configured,
+	// This example assumes only one provider (Cloudflare) is configured,
 	// matching the previous logic but using the new map structure.
 	// A more robust implementation would iterate or select the correct provider.
-	providerName := "cloudflare" // Hardcoded for this example
+	providerName := DNSProviderCloudflare // Use constant
 	providerConfig, ok := cfg.DNSProviders[providerName]
 	if !ok {
 		err := fmt.Errorf("required DNS provider '%s' not found in configuration", providerName)
@@ -105,9 +111,9 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 		return err
 	}
 
-	var cfProvider *cloudflare.DNSProvider
+	var dnsProvider lego.ChallengeProvider // Use interface type
 	switch providerName {
-	case "cloudflare":
+	case DNSProviderCloudflare:
 		cfLegoConfig := cloudflare.NewDefaultConfig()
 		cfLegoConfig.AuthToken = providerConfig.APIToken // Get token from the map value
 		// Add other CF config if needed (AuthEmail, AuthKey, ZoneToken etc.) based on your auth method
@@ -117,6 +123,8 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 			h.logger.Error("Failed to create Cloudflare DNS provider", "error", err)
 			return fmt.Errorf("failed to create Cloudflare provider: %w", err)
 		}
+		dnsProvider = cfProvider // Assign to the interface variable
+	// Add cases for other providers here
 	default:
 		err := fmt.Errorf("unsupported DNS provider configured: %q", providerName)
 		h.logger.Error(err.Error())
@@ -124,16 +132,9 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 	}
 
 	// Set DNS challenge provider with a suitable timeout
-	err = legoClient.Challenge.SetDNS01Provider(cfProvider, dns01.AddDNSTimeout(10*time.Minute))
+	err = legoClient.Challenge.SetDNS01Provider(dnsProvider, dns01.AddDNSTimeout(10*time.Minute))
 	if err != nil {
-		h.logger.Error("Failed to create Cloudflare DNS provider", "error", err)
-		return fmt.Errorf("failed to create Cloudflare provider: %w", err)
-	}
-
-	// Set DNS challenge provider with a suitable timeout
-	err = legoClient.Challenge.SetDNS01Provider(cfProvider, dns01.AddDNSTimeout(10*time.Minute))
-	if err != nil {
-		h.logger.Error("Failed to set DNS01 provider", "error", err)
+		h.logger.Error("Failed to set DNS01 provider", "provider", providerName, "error", err)
 		return fmt.Errorf("failed to set DNS01 provider: %w", err)
 	}
 

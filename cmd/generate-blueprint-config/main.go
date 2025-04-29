@@ -13,7 +13,7 @@ import (
 
 func generateBlueprintConfig() acme.Config {
 	dnsProviders := map[string]acme.DNSProvider{
-		"cloudflare": {
+		acme.DNSProviderCloudflare: { // Use the constant from the acme package
 			APIToken: "YOUR_CLOUDFLARE_API_TOKEN_ENV_VAR_OR_SECRET",
 		},
 	}
