@@ -1,12 +1,9 @@
-package acme 
-
 package acme
 
 import (
 	"context"
 	"crypto"
 	"crypto/x509"
-	"encoding/json" // Add json import
 	"encoding/pem"
 	"fmt"
 	"log/slog"
@@ -14,7 +11,7 @@ import (
 	"time"
 
 	"github.com/caasmo/restinpieces/config"
-	rip_queue "github.com/caasmo/restinpieces/queue"
+	 "github.com/caasmo/restinpieces/db"
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/go-acme/lego/v4/certcrypto"
@@ -86,7 +83,7 @@ func (u *AcmeUser) GetRegistration() *registration.Resource { return u.Registrat
 func (u *AcmeUser) GetPrivateKey() crypto.PrivateKey        { return u.PrivateKey }
 
 // Handle executes the certificate renewal logic.
-func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) error {
+func (h *CertRenewalHandler) Handle(ctx context.Context, job db.Job) error {
 	cfg := h.config // Use the handler's config
 
 	h.logger.Info("Attempting certificate renewal process", "domains", cfg.Domains)
