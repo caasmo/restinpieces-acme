@@ -33,11 +33,10 @@ func main() {
 	// --- Framework Flags ---
 	dbPath := flag.String("db", "", "Path to the SQLite DB (used by framework AND acme history)")
 	ageKeyPath := flag.String("age-key", "", "Path to the age identity (private key) file (required)")
-	acmeConfigPath := flag.String("acme-config", "", "Path to the ACME configuration TOML file (required)")
 
 	// Set custom usage message for the application
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s -db <db-path> -age-key <id-path> -acme-config <acme-cfg-path>\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s -db <db-path> -age-key <id-path>\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Start the restinpieces application server with ACME support.\n\n")
 		fmt.Fprintf(os.Stderr, "Flags:\n")
 		flag.PrintDefaults()
@@ -47,27 +46,12 @@ func main() {
 	flag.Parse()
 
 	// Validate required flags
-	if *dbPath == "" || *ageKeyPath == "" || *acmeConfigPath == "" {
+	if *dbPath == "" || *ageKeyPath == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	// --- Load ACME Renewal Config from File ---
-	slog.Info("Loading ACME renewal configuration", "path", *acmeConfigPath)
-	acmeCfgBytes, err := os.ReadFile(*acmeConfigPath)
-	if err != nil {
-		slog.Error("Failed to read ACME configuration file", "path", *acmeConfigPath, "error", err)
-		os.Exit(1)
-	}
-
 	var renewalCfg acme.Config
-	err = toml.Unmarshal(acmeCfgBytes, &renewalCfg)
-	if err != nil {
-		slog.Error("Failed to parse ACME configuration TOML", "path", *acmeConfigPath, "error", err)
-		os.Exit(1)
-	}
-
-	slog.Info("ACME renewal configuration loaded successfully")
 
 	// --- Create Database Pool (Shared by framework and ACME history) ---
 	dbPool, err := restinpieces.NewZombiezenPool(*dbPath) // Use dbPath

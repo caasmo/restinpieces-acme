@@ -23,6 +23,7 @@ import (
 
 // --- Constants ---
 const (
+	ConfigScope           = "acme_config"
 	DNSProviderCloudflare = "cloudflare"
 	// Add constants for other supported providers here
 )
