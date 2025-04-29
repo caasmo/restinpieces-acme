@@ -174,7 +174,7 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 	}
 	h.logger.Info("Successfully obtained certificate", "domains", request.Domains, "certificate_url", resource.CertURL)
 
-	if err := h.saveCertificateConfig(resource, h.logger); err != nil {
+	if err := h.saveCertificate(resource, h.logger); err != nil {
 		return err
 	}
 
@@ -182,7 +182,7 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 	return nil
 }
 
-func (h *CertRenewalHandler) saveCertificateConfig(resource *certificate.Resource, logger *slog.Logger) error {
+func (h *CertRenewalHandler) saveCertificate(resource *certificate.Resource, logger *slog.Logger) error {
 	certData := Cert{
 		CertificateChain: string(resource.Certificate),
 		PrivateKey:       string(resource.PrivateKey),
