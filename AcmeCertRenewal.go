@@ -2,6 +2,7 @@ package acme // Or root package of your module
 
 import (
 	"context"
+	"errors" // Added for potential future validation
 	"crypto"
 	"crypto/x509"
 	"encoding/json"
@@ -19,6 +20,23 @@ import (
 	"github.com/go-acme/lego/v4/providers/dns/cloudflare"
 	"github.com/go-acme/lego/v4/registration"
 )
+
+// --- Configuration Structs ---
+
+type DNSProvider struct {
+	APIToken string
+	// Add other provider-specific fields here if needed (e.g., AWS credentials)
+}
+
+type Config struct {
+	Email                 string
+	Domains               []string
+	DNSProviders          map[string]DNSProvider // Map provider name (e.g., "cloudflare") to its config
+	CADirectoryURL        string
+	AcmeAccountPrivateKey string // PEM format
+}
+
+// --- Job Handler ---
 
 // CertRenewalHandler handles the job for renewing TLS certificates.
 type CertRenewalHandler struct {
