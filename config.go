@@ -3,24 +3,25 @@ package acme // Or root package of your module
 import (
 	"errors"
 	"fmt"
-	"log/slog" // Use slog for logging
+	"log/slog"
 )
 
-// Config holds settings specifically for the certificate renewal process.
-type Config struct {
-	Enabled               bool     // Master switch for this renewal config
-	Email                 string   // ACME account email
-	Domains               []string // Domains for the certificate
-	DNSProvider           string   // Currently only "cloudflare" supported by handler example
-	CloudflareApiToken    string   // !! Sensitive - Load securely later !!
-	CADirectoryURL        string   // Let's Encrypt Staging/Prod URL
-	AcmeAccountPrivateKey string   // !! Sensitive - PEM format - Load securely later !!
+type DNSProviderConfig struct {
+	APIToken string
 }
 
-// Validate checks if the configuration is usable.
+type Config struct {
+	Enabled               bool
+	Email                 string
+	Domains               []string
+	DNSProviders          map[string]DNSProviderConfig
+	CADirectoryURL        string
+	AcmeAccountPrivateKey string
+}
+
 func (c *Config) Validate() error {
 	if !c.Enabled {
-		return nil // No validation needed if disabled
+		return nil
 	}
 	if c.Email == "" {
 		return errors.New("config: email cannot be empty when enabled")
@@ -28,14 +29,19 @@ func (c *Config) Validate() error {
 	if len(c.Domains) == 0 {
 		return errors.New("config: domains cannot be empty when enabled")
 	}
-	if c.DNSProvider == "" {
-		return errors.New("config: dns_provider cannot be empty when enabled")
+	if len(c.DNSProviders) == 0 {
+		return errors.New("config: dns_providers cannot be empty when enabled")
 	}
-	// Specific provider checks
-	if c.DNSProvider == "cloudflare" && c.CloudflareApiToken == "" {
-		return errors.New("config: cloudflare_api_token cannot be empty when dns_provider is 'cloudflare'")
+	for providerName, providerCfg := range c.DNSProviders {
+		switch providerName {
+		case "cloudflare":
+			if providerCfg.APIToken == "" {
+				return fmt.Errorf("config: api_token cannot be empty for dns_provider '%s'", providerName)
+			}
+		default:
+			slog.Warn("config: validation not implemented for dns_provider", "provider", providerName)
+		}
 	}
-	// Key checks
 	if c.AcmeAccountPrivateKey == "" {
 		return errors.New("config: acme_account_private_key cannot be empty when enabled")
 	}
@@ -49,29 +55,21 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// LoadConfig creates or loads the renewal configuration.
-// Placeholder: Replace hardcoded values with secure loading (e.g., env vars, secret manager).
 func LoadConfig() (*Config, error) {
-	// TODO: Replace hardcoded values with loading from environment variables or a secret manager.
-	// Example using environment variables (adjust names as needed):
-	// email := os.Getenv("ACME_EMAIL")
-	// domains := strings.Split(os.Getenv("ACME_DOMAINS"), ",") // Example parsing
-	// ... etc ...
 
 	cfg := &Config{
-		// --- Hardcoded Example Values (Replace these!) ---
-		Enabled:            true, // Set true/false via env or config file later
-		Email:              "your-acme-account@example.com",
-		Domains:            []string{"your.domain.com", "www.your.domain.com"},
-		DNSProvider:        "cloudflare",
-		CloudflareApiToken: "YOUR_CLOUDFLARE_API_TOKEN_HERE",                         // !! Load securely !!
-		CADirectoryURL:     "https://acme-staging-v02.api.letsencrypt.org/directory", // Staging recommended for testing
-		// CADirectoryURL:     "https://acme-v02.api.letsencrypt.org/directory", // Production
-		AcmeAccountPrivateKey: `-----BEGIN EC PRIVATE KEY-----\nPASTE_YOUR_PEM_KEY_HERE\n-----END EC PRIVATE KEY-----`, // !! Load securely !!
-		// --- End Hardcoded ---
+		Enabled: true,
+		Email:   "your-acme-account@example.com",
+		Domains: []string{"your.domain.com", "www.your.domain.com"},
+		DNSProviders: map[string]DNSProviderConfig{
+			"cloudflare": {
+				APIToken: "YOUR_CLOUDFLARE_API_TOKEN_HERE",
+			},
+		},
+		CADirectoryURL:        "https://acme-staging-v02.api.letsencrypt.org/directory",
+		AcmeAccountPrivateKey: `-----BEGIN EC PRIVATE KEY-----\nPASTE_YOUR_PEM_KEY_HERE\n-----END EC PRIVATE KEY-----`,
 	}
 
-	// Log loading attempt (avoid logging sensitive data directly)
 	slog.Info("Loading ACME renewal configuration (currently hardcoded)")
 
 	if err := cfg.Validate(); err != nil {
@@ -79,15 +77,22 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("invalid renewal configuration: %w", err)
 	}
 
-	// Log success, maybe mask sensitive fields if logging config itself
-	slog.Info("ACME renewal configuration loaded and validated successfully", "enabled", cfg.Enabled, "email", cfg.Email, "domains", cfg.Domains, "provider", cfg.DNSProvider, "ca_url", cfg.CADirectoryURL)
+	providerNames := make([]string, 0, len(cfg.DNSProviders))
+	for k := range cfg.DNSProviders {
+		providerNames = append(providerNames, k)
+	}
+	slog.Info("ACME renewal configuration loaded and validated successfully", "enabled", cfg.Enabled, "email", cfg.Email, "domains", cfg.Domains, "providers", providerNames, "ca_url", cfg.CADirectoryURL)
 
-	// Warning about hardcoded secrets if applicable
-	// This check is basic; refine based on how you load secrets later.
-	if cfg.CloudflareApiToken == "YOUR_CLOUDFLARE_API_TOKEN_HERE" || cfg.AcmeAccountPrivateKey == `-----BEGIN EC PRIVATE KEY-----\nPASTE_YOUR_PEM_KEY_HERE\n-----END EC PRIVATE KEY-----` {
+	placeholderSecretDetected := false
+	if providerCfg, ok := cfg.DNSProviders["cloudflare"]; ok && providerCfg.APIToken == "YOUR_CLOUDFLARE_API_TOKEN_HERE" {
+		placeholderSecretDetected = true
+	}
+	if cfg.AcmeAccountPrivateKey == `-----BEGIN EC PRIVATE KEY-----\nPASTE_YOUR_PEM_KEY_HERE\n-----END EC PRIVATE KEY-----` {
+		placeholderSecretDetected = true
+	}
+
+	if placeholderSecretDetected {
 		slog.Warn("ACME configuration contains placeholder secrets. Replace hardcoded values!")
-		// Optionally return an error here in production environments
-		// return nil, errors.New("placeholder secrets detected in ACME configuration")
 	}
 
 	return cfg, nil
