@@ -68,22 +68,8 @@ func main() {
 	}
 
 	slog.Info("ACME renewal configuration loaded successfully")
-	// Note: Add logic here to replace placeholders in renewalCfg (e.g., API tokens, keys)
-	// with values from environment variables or a secret management system.
-	// Example:
-	// if token := os.Getenv("CLOUDFLARE_API_TOKEN"); token != "" {
-	//     if provider, ok := renewalCfg.DNSProviders["cloudflare"]; ok {
-	//         provider.APIToken = token
-	//         renewalCfg.DNSProviders["cloudflare"] = provider // Update map value
-	//     }
-	// }
-	// if key := os.Getenv("ACME_ACCOUNT_PRIVATE_KEY"); key != "" {
-	//     renewalCfg.AcmeAccountPrivateKey = key
-	// }
-	// Re-validate after potential modifications if necessary.
 
 	// --- Create Database Pool (Shared by framework and ACME history) ---
-	// Use the helper from the library to create a pool with suitable defaults.
 	dbPool, err := restinpieces.NewZombiezenPool(*dbPath) // Use dbPath
 	if err != nil {
 		slog.Error("failed to create database pool", "path", *dbPath, "error", err)
@@ -128,13 +114,6 @@ func main() {
 	}
 	frameworkLogger.Info("Registered certificate renewal job handler", "job_type", JobTypeCertRenewal)
 
-	// Reminder: This setup registers the handler, but doesn't automatically
-	// schedule the JobTypeCertRenewal job. That needs a separate mechanism:
-	// - A manual trigger (API call, CLI command to enqueue the job)
-	// - A dedicated scheduler daemon added via srv.AddDaemon()
-	// - Integration with an external scheduler.
-
-	// PreRouter initialization is handled internally within restinpieces.New
 
 	// --- Start Server ---
 	// The Run method blocks until the server stops (e.g., via signal).
