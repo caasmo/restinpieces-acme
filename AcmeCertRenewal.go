@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	"errors" // Added for potential future validation
 	"fmt"
 	"log/slog"
 	"time"
