@@ -25,14 +25,11 @@ import (
 const (
 	ConfigScope           = "acme_config"
 	DNSProviderCloudflare = "cloudflare"
-	// Add constants for other supported providers here
 )
 
-// --- Configuration Structs ---
 
 type DNSProvider struct {
 	APIToken string
-	// Add other provider-specific fields here if needed (e.g., AWS credentials)
 }
 
 type Config struct {
@@ -43,7 +40,6 @@ type Config struct {
 	AcmeAccountPrivateKey string // PEM format
 }
 
-// --- Job Handler ---
 
 // CertRenewalHandler handles the job for renewing TLS certificates.
 type CertRenewalHandler struct {
