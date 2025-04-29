@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
+	"encoding/json" // Add json import
 	"encoding/pem"
 	"fmt"
 	"log/slog"
@@ -46,9 +47,14 @@ type Config struct {
 }
 
 // Cert defines the structure for the TOML config to be saved.
+// Note: TOML tags are not strictly needed here as we marshal the whole struct.
 type Cert struct {
-	CertificateChain string `toml:"certificate_chain"`
-	PrivateKey       string `toml:"private_key"`
+	Identifier       string    // Identifier for the cert request (e.g., primary domain)
+	Domains          string    // JSON array of all domains covered
+	CertificateChain string    // PEM encoded certificate chain
+	PrivateKey       string    // PEM encoded private key for the cert (Sensitive!)
+	IssuedAt         time.Time // UTC timestamp of issuance
+	ExpiresAt        time.Time // UTC timestamp of expiry
 }
 
 type CertRenewalHandler struct {
@@ -183,42 +189,57 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 }
 
 func (h *CertRenewalHandler) saveCertificate(resource *certificate.Resource, logger *slog.Logger) error {
-	certData := Cert{
-		CertificateChain: string(resource.Certificate),
-		PrivateKey:       string(resource.PrivateKey),
+	// 1. Parse the certificate to get expiry and issue dates
+	block, _ := pem.Decode(resource.Certificate)
+	if block == nil {
+		err := fmt.Errorf("failed to decode PEM block from obtained certificate chain")
+		logger.Error(err.Error(), "domain", resource.Domain)
+		return err
+	}
+	cert, err := x509.ParseCertificate(block.Bytes) // Parse the leaf certificate
+	if err != nil {
+		err = fmt.Errorf("failed to parse obtained leaf certificate: %w", err)
+		logger.Error(err.Error(), "domain", resource.Domain)
+		return err
 	}
 
+	// 2. Prepare domains list as JSON string (using the domains from the config used for this request)
+	domainsJSON, err := json.Marshal(h.config.Domains)
+	if err != nil {
+		err = fmt.Errorf("failed to marshal domains %v to JSON: %w", h.config.Domains, err)
+		logger.Error(err.Error())
+		return err
+	}
+
+	// 3. Create the Cert struct
+	certData := Cert{
+		Identifier:       resource.Domain, // Use primary domain from resource as identifier
+		Domains:          string(domainsJSON),
+		CertificateChain: string(resource.Certificate), // Full PEM chain
+		PrivateKey:       string(resource.PrivateKey),  // Corresponding PEM private key
+		IssuedAt:         cert.NotBefore.UTC(),         // Use parsed cert's NotBefore
+		ExpiresAt:        cert.NotAfter.UTC(),          // Use parsed cert's NotAfter
+	}
+
+	// 4. Marshal the Cert struct to TOML
 	tomlBytes, err := toml.Marshal(certData)
 	if err != nil {
-		logger.Error("Failed to marshal certificate output to TOML", "error", err)
-		return fmt.Errorf("failed to marshal certificate output to TOML: %w", err)
+		logger.Error("Failed to marshal certificate data to TOML", "error", err)
+		return fmt.Errorf("failed to marshal certificate data to TOML: %w", err)
 	}
 
-	var expiryStr string
-	block, _ := pem.Decode(resource.Certificate)
-	if block != nil {
-		cert, err := x509.ParseCertificate(block.Bytes)
-		if err == nil {
-			expiryStr = cert.NotAfter.UTC().Format(time.RFC3339)
-		} else {
-			logger.Warn("Could not parse certificate to get expiry for description", "error", err)
-		}
-	} else {
-		logger.Warn("Could not decode PEM block to get expiry for description")
-	}
+	// 5. Determine description using parsed expiry date
+	expiryStr := certData.ExpiresAt.Format(time.RFC3339)
+	description := fmt.Sprintf("Obtained certificate for domains: %s (expires %s)", strings.Join(h.config.Domains, ", "), expiryStr)
 
-	description := fmt.Sprintf("Obtained certificate for domains: %s", strings.Join(h.config.Domains, ", "))
-	if expiryStr != "" {
-		description += fmt.Sprintf(" (expires %s)", expiryStr)
-	}
-
-	logger.Info("Saving obtained certificate configuration", "scope", CertificateOutputScope, "format", "toml")
+	// 6. Save using SecureConfigStore
+	logger.Info("Saving obtained certificate configuration", "scope", CertificateOutputScope, "format", "toml", "identifier", certData.Identifier)
 	err = h.secureConfigStore.Save(CertificateOutputScope, tomlBytes, "toml", description)
 	if err != nil {
 		logger.Error("Failed to save certificate config via SecureConfigStore", "scope", CertificateOutputScope, "error", err)
 		return err
 	}
 
-	logger.Info("Successfully saved certificate configuration", "scope", CertificateOutputScope)
+	logger.Info("Successfully saved certificate configuration", "scope", CertificateOutputScope, "identifier", certData.Identifier)
 	return nil
 }
