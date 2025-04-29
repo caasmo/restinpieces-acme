@@ -24,8 +24,9 @@ import (
 )
 
 const (
-	ConfigScope           = "acme_config"
-	DNSProviderCloudflare = "cloudflare"
+	ConfigScope            = "acme_config"
+	CertificateOutputScope = "certificate_output" // Scope for saving the obtained cert+key
+	DNSProviderCloudflare  = "cloudflare"
 )
 
 
