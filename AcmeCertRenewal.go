@@ -113,7 +113,7 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 	}
 
 	var dnsProvider challenge.Provider // Use interface type from imported package
-	var err error                      // Declare err for use inside switch cases
+	// err is already declared earlier in the function scope
 	switch providerName {
 	case DNSProviderCloudflare:
 		cfLegoConfig := cloudflare.NewDefaultConfig()
