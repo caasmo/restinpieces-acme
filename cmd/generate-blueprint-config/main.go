@@ -67,5 +67,4 @@ func main() {
 	}
 
 	logger.Info("ACME blueprint configuration generated successfully", "path", *outputFileFlag)
-	logger.Warn("IMPORTANT: Review the generated file, replace placeholders, and ensure secrets (API tokens, private keys) are loaded securely (e.g., via environment variables or a secret manager) in your actual application configuration.")
 }
