@@ -21,7 +21,6 @@ import (
 	"github.com/go-acme/lego/v4/registration"
 )
 
-// --- Constants ---
 const (
 	ConfigScope           = "acme_config"
 	DNSProviderCloudflare = "cloudflare"
