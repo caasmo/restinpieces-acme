@@ -70,26 +70,26 @@ func main() {
 		slog.Error("failed to initialize restinpieces application", "error", err)
 		os.Exit(1) // Pool closed by defer
 	}
-	frameworkLogger := app.Logger() // Get logger from framework
+	logger := app.Logger() // Get logger from framework
 
 	// --- Load ACME Renewal Config from SecureConfigStore ---
-	frameworkLogger.Info("Loading ACME configuration from database", "scope", acme.ConfigScope)
+	logger.Info("Loading ACME configuration from database", "scope", acme.ConfigScope)
 	encryptedTomlData, err := app.SecureConfigStore().Latest(acme.ConfigScope)
 	if err != nil {
-		frameworkLogger.Error("failed to load ACME config from DB", "scope", acme.ConfigScope, "error", err)
+		logger.Error("failed to load ACME config from DB", "scope", acme.ConfigScope, "error", err)
 		os.Exit(1)
 	}
 	if len(encryptedTomlData) == 0 {
-		frameworkLogger.Error("ACME config data loaded from DB is empty", "scope", acme.ConfigScope)
+		logger.Error("ACME config data loaded from DB is empty", "scope", acme.ConfigScope)
 		os.Exit(1)
 	}
 
 	var renewalCfg acme.Config // Declare variable to hold the config
 	if err := toml.Unmarshal(encryptedTomlData, &renewalCfg); err != nil {
-		frameworkLogger.Error("failed to unmarshal ACME TOML config", "scope", acme.ConfigScope, "error", err)
+		logger.Error("failed to unmarshal ACME TOML config", "scope", acme.ConfigScope, "error", err)
 		os.Exit(1)
 	}
-	frameworkLogger.Info("Successfully unmarshalled ACME config", "scope", acme.ConfigScope)
+	logger.Info("Successfully unmarshalled ACME config", "scope", acme.ConfigScope)
 
 	// --- Setup ACME Dependencies ---
 	// Create the DbWriter implementation instance using the shared pool
@@ -97,15 +97,15 @@ func main() {
 
 	// --- Instantiate and Register ACME Handler ---
 	// Pass the loaded renewalCfg
-	certHandler := acme.NewCertRenewalHandler(&renewalCfg, certDbWriter, frameworkLogger)
+	certHandler := acme.NewCertRenewalHandler(&renewalCfg, certDbWriter, logger)
 
 	// Register the handler with the framework's server instance
 	err = srv.AddJobHandler(JobTypeCertRenewal, certHandler)
 	if err != nil {
-		frameworkLogger.Error("Failed to register certificate renewal job handler", "job_type", JobTypeCertRenewal, "error", err)
+		logger.Error("Failed to register certificate renewal job handler", "job_type", JobTypeCertRenewal, "error", err)
 		os.Exit(1)
 	}
-	frameworkLogger.Info("Registered certificate renewal job handler", "job_type", JobTypeCertRenewal)
+	logger.Info("Registered certificate renewal job handler", "job_type", JobTypeCertRenewal)
 
 
 	// --- Start Server ---
