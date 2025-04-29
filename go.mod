@@ -4,7 +4,7 @@ go 1.24.2
 
 require (
 	filippo.io/age v1.2.1
-	github.com/caasmo/restinpieces v0.0.0-20250421160402-7048001072cd
+	github.com/caasmo/restinpieces v0.0.0-20250428195634-6799b5322a71
 	github.com/go-acme/lego/v4 v4.23.1
 	github.com/pelletier/go-toml/v2 v2.2.4
 	zombiezen.com/go/sqlite v1.4.0

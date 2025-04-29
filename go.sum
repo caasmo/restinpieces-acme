@@ -6,6 +6,8 @@ github.com/OneOfOne/xxhash v1.2.8 h1:31czK/TI9sNkxIKfaUfGlU47BAxQ0ztGgd9vPyqimf8
 github.com/OneOfOne/xxhash v1.2.8/go.mod h1:eZbhyaAYD41SGSSsnmcpxVoRiQ/MPUTjUdIIOT9Um7Q=
 github.com/caasmo/restinpieces v0.0.0-20250421160402-7048001072cd h1:vruNqL4TDQJxEtjx3sRLevg9dl2FkxkzRQfY/dnCsYk=
 github.com/caasmo/restinpieces v0.0.0-20250421160402-7048001072cd/go.mod h1:mk3G1wfnaiCOjrIAvKLseJ0kWhH4+h/s8f/UO+gUHMc=
+github.com/caasmo/restinpieces v0.0.0-20250428195634-6799b5322a71 h1:NgcFUj/DYnXr8Dhz1AAnfEeyG4vnmbENU1B2J8PP5DY=
+github.com/caasmo/restinpieces v0.0.0-20250428195634-6799b5322a71/go.mod h1:ZaHp9BQjwapiT/Xye4VR+WgQLQIDOyl9Y432iJbcyTY=
 github.com/cenkalti/backoff/v4 v4.3.0 h1:MyRJ/UdXutAwSAT+s3wNd7MfTIcy71VQueUuFK343L8=
 github.com/cenkalti/backoff/v4 v4.3.0/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
