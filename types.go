@@ -36,4 +36,3 @@ func TimeParse(s string) (time.Time, error) {
 	}
 	return t, nil
 }
-

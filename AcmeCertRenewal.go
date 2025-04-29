@@ -47,9 +47,9 @@ type AcmeUser struct {
 	PrivateKey   crypto.PrivateKey
 }
 
-func (u *AcmeUser) GetEmail() string                    { return u.Email }
+func (u *AcmeUser) GetEmail() string                        { return u.Email }
 func (u *AcmeUser) GetRegistration() *registration.Resource { return u.Registration }
-func (u *AcmeUser) GetPrivateKey() crypto.PrivateKey      { return u.PrivateKey }
+func (u *AcmeUser) GetPrivateKey() crypto.PrivateKey        { return u.PrivateKey }
 
 // Handle executes the certificate renewal logic.
 func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) error {
@@ -136,11 +136,11 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 	// --- Save Certificate History to Database ---
 	if err := h.saveCertificateHistory(resource, h.logger); err != nil {
 		// Error is already logged by saveCertificateHistory
-		return err 
+		return err
 	}
 
 	h.logger.Info("Successfully processed certificate renewal job.", "domains", request.Domains)
-	return nil 
+	return nil
 }
 
 // saveCertificateHistory saves the obtained certificate resource to the database history.
@@ -189,4 +189,3 @@ func (h *CertRenewalHandler) saveCertificateHistory(resource *certificate.Resour
 	logger.Info("Successfully added certificate record to history database", "identifier", dbCert.Identifier, "expiry", dbCert.ExpiresAt.Format(time.RFC3339))
 	return nil
 }
-

@@ -7,17 +7,16 @@ import (
 	"os"
 	"time"
 
-	"github.com/caasmo/restinpieces/config"         // Adjust import path if needed
-	"github.com/caasmo/restinpieces/db/zombiezen"   // Changed to zombiezen implementation
-	"github.com/caasmo/restinpieces/queue"          // Adjust import path if needed
-	"github.com/caasmo/restinpieces/queue/handlers" // Adjust import path if needed
-	"zombiezen.com/go/sqlite"                       // Keep for OpenFlags
-	"zombiezen.com/go/sqlite/sqlitex"               // Added for pool
+	"github.com/caasmo/restinpieces/config"
+	"github.com/caasmo/restinpieces/db/zombiezen"
+	"github.com/caasmo/restinpieces/queue"
+	"github.com/caasmo/restinpieces/queue/handlers"
+	"zombiezen.com/go/sqlite"
+	"zombiezen.com/go/sqlite/sqlitex"
 )
 
 func main() {
-	// Basic Logger Setup
-	logLevel := slog.LevelInfo // Default
+	logLevel := slog.LevelInfo
 	if os.Getenv("LOG_LEVEL") == "debug" {
 		logLevel = slog.LevelDebug
 	}
@@ -29,10 +28,8 @@ func main() {
 	// --- Flags ---
 	var configPath string
 	var dbPath string
-	// var forceIssue bool // Removed force flag
 	flag.StringVar(&configPath, "config", "config.toml", "path to config TOML file")
 	flag.StringVar(&dbPath, "dbfile", "app.db", "path to SQLite database file")
-	// flag.BoolVar(&forceIssue, "force", false, "force certificate issuance even if valid cert exists") // Removed force flag
 	flag.Parse()
 
 	// --- Configuration Loading ---
@@ -75,12 +72,9 @@ func main() {
 			logger.Info("Database pool closed.")
 		}
 	}()
-	// Create Db instance satisfying interfaces using the zombiezen implementation with the pool
 	dbConn, err := zombiezen.New(pool) // Use the New constructor which takes a pool
 	if err != nil {
-		// This error check was missing in the previous pool refactor, adding it now.
 		logger.Error("Failed to create zombiezen DB instance from pool", "error", err)
-		// This error check was missing in the previous pool refactor, adding it now.
 		logger.Error("Failed to create zombiezen DB instance from pool", "error", err)
 		os.Exit(1)
 	}
@@ -89,23 +83,16 @@ func main() {
 	logger.Info("Attempting to load existing certificate from database...")
 	existingCert, err := dbConn.Get()
 	if err != nil {
-		// Log the error, but proceed if it's just "not found"
-		// Assuming db.Get() returns nil, nil or a specific error for not found
-		// Adjust this check if db.Get() has different error semantics for "not found"
 		if err.Error() == "acme: no certificate found" { // Example check, adjust as needed
 			logger.Info("No existing certificate found in the database. Will attempt issuance if needed.")
 		} else {
 			logger.Warn("Failed to get existing certificate from database. Proceeding, may force issuance.", "error", err)
-			// Proceed, CertData/KeyData will be empty in cfg
 		}
 	} else if existingCert != nil {
 		logger.Info("Existing certificate loaded from database.", "identifier", existingCert.Identifier, "expires", existingCert.ExpiresAt)
 		cfg.Server.CertData = existingCert.CertificateChain
 		cfg.Server.KeyData = existingCert.PrivateKey
-		// Log snippet for verification?
-		// logger.Debug("Loaded CertData (snippet)", "data", cfg.Server.CertData[:min(100, len(cfg.Server.CertData))]+"...")
 	} else {
-		// This case (nil, nil) might indicate "not found" depending on Get() implementation
 		logger.Info("No existing certificate found in the database (Get returned nil, nil). Will attempt issuance if needed.")
 	}
 
@@ -116,10 +103,6 @@ func main() {
 	renewalHandler := handlers.NewTLSCertRenewalHandler(cfgProvider, dbConn, logger)
 
 	// --- Job Execution ---
-	// Create a context (e.g., with a timeout)
-	// Force issuance logic removed as handler now checks CertData from config provider.
-	// This command loads config from file, where CertData is typically empty,
-	// thus triggering the handler's issuance logic if ACME is enabled.
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute) // Generous timeout for ACME+DNS
 	defer cancel()
 

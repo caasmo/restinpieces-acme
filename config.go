@@ -60,12 +60,12 @@ func LoadConfig() (*Config, error) {
 
 	cfg := &Config{
 		// --- Hardcoded Example Values (Replace these!) ---
-		Enabled:               true, // Set true/false via env or config file later
-		Email:                 "your-acme-account@example.com",
-		Domains:               []string{"your.domain.com", "www.your.domain.com"},
-		DNSProvider:           "cloudflare",
-		CloudflareApiToken:    "YOUR_CLOUDFLARE_API_TOKEN_HERE", // !! Load securely !!
-		CADirectoryURL:        "https://acme-staging-v02.api.letsencrypt.org/directory", // Staging recommended for testing
+		Enabled:            true, // Set true/false via env or config file later
+		Email:              "your-acme-account@example.com",
+		Domains:            []string{"your.domain.com", "www.your.domain.com"},
+		DNSProvider:        "cloudflare",
+		CloudflareApiToken: "YOUR_CLOUDFLARE_API_TOKEN_HERE",                         // !! Load securely !!
+		CADirectoryURL:     "https://acme-staging-v02.api.letsencrypt.org/directory", // Staging recommended for testing
 		// CADirectoryURL:     "https://acme-v02.api.letsencrypt.org/directory", // Production
 		AcmeAccountPrivateKey: `-----BEGIN EC PRIVATE KEY-----\nPASTE_YOUR_PEM_KEY_HERE\n-----END EC PRIVATE KEY-----`, // !! Load securely !!
 		// --- End Hardcoded ---
