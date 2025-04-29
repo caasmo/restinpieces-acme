@@ -45,7 +45,8 @@ type Config struct {
 	AcmeAccountPrivateKey string
 }
 
-type CertificateOutput struct {
+// Cert defines the structure for the TOML config to be saved.
+type Cert struct {
 	CertificateChain string `toml:"certificate_chain"`
 	PrivateKey       string `toml:"private_key"`
 }
@@ -182,12 +183,12 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 }
 
 func (h *CertRenewalHandler) saveCertificateConfig(resource *certificate.Resource, logger *slog.Logger) error {
-	outputData := CertificateOutput{
+	certData := Cert{
 		CertificateChain: string(resource.Certificate),
 		PrivateKey:       string(resource.PrivateKey),
 	}
 
-	tomlBytes, err := toml.Marshal(outputData)
+	tomlBytes, err := toml.Marshal(certData)
 	if err != nil {
 		logger.Error("Failed to marshal certificate output to TOML", "error", err)
 		return fmt.Errorf("failed to marshal certificate output to TOML: %w", err)
