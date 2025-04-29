@@ -51,12 +51,7 @@ const JobTypeCertRenewal = "certificate_renewal"
 		os.Exit(1)
 	}
 
-	// Validate the loaded ACME config
-	if err := renewalCfg.Validate(); err != nil {
-		slog.Error("Invalid ACME renewal configuration loaded from file", "path", *acmeConfigPath, "error", err)
-		os.Exit(1)
-	}
-	slog.Info("ACME renewal configuration loaded and validated successfully")
+	slog.Info("ACME renewal configuration loaded successfully")
 	// Note: Add logic here to replace placeholders in renewalCfg (e.g., API tokens, keys)
 	// with values from environment variables or a secret management system.
 	// Example:

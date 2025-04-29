@@ -8,32 +8,22 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/caasmo/restinpieces-acme" // Import your acme package
+	"github.com/caasmo/restinpieces-acme"
 )
 
-// generateBlueprintConfig creates an acme.Config struct populated with example/dummy data.
 func generateBlueprintConfig() acme.Config {
-	// Define example DNS providers
 	dnsProviders := map[string]acme.DNSProvider{
 		"cloudflare": {
-			APIToken: "YOUR_CLOUDFLARE_API_TOKEN_ENV_VAR_OR_SECRET", // Placeholder: Load securely
+			APIToken: "YOUR_CLOUDFLARE_API_TOKEN_ENV_VAR_OR_SECRET",
 		},
-		// Add other provider examples if needed
-		// "route53": {
-		//  AccessKeyID: "YOUR_AWS_ACCESS_KEY_ID_ENV_VAR",
-		//  SecretAccessKey: "YOUR_AWS_SECRET_ACCESS_KEY_ENV_VAR",
-		//  Region: "us-east-1",
-		// },
 	}
 
-	// Create the main config struct with example values
 	cfg := acme.Config{
-		Email:        "your-acme-account@example.com",                     // Placeholder: Your ACME account email
-		Domains:      []string{"example.com", "www.example.com"},          // Placeholder: Domains for the certificate
-		DNSProviders: dnsProviders,                                        // Example DNS providers map
-		CADirectoryURL: "https://acme-staging-v02.api.letsencrypt.org/directory", // Staging URL (use production URL carefully)
-		// CADirectoryURL: "https://acme-v02.api.letsencrypt.org/directory", // Production URL
-		AcmeAccountPrivateKey: `-----BEGIN EC PRIVATE KEY-----\nPASTE_YOUR_ACME_ACCOUNT_PRIVATE_KEY_PEM_HERE\n-----END EC PRIVATE KEY-----`, // Placeholder: Load securely
+		Email:                 "your-acme-account@example.com",
+		Domains:               []string{"example.com", "www.example.com"},
+		DNSProviders:          dnsProviders,
+		CADirectoryURL:        "https://acme-staging-v02.api.letsencrypt.org/directory",
+		AcmeAccountPrivateKey: `-----BEGIN EC PRIVATE KEY-----\nPASTE_YOUR_ACME_ACCOUNT_PRIVATE_KEY_PEM_HERE\n-----END EC PRIVATE KEY-----`,
 	}
 
 	return cfg
@@ -59,12 +49,6 @@ func main() {
 
 	logger.Info("Generating ACME blueprint configuration...")
 	blueprintCfg := generateBlueprintConfig()
-
-	// Validate the generated blueprint config (optional but good practice)
-	if err := blueprintCfg.Validate(); err != nil {
-		// Log validation errors for the blueprint itself
-		logger.Warn("Generated blueprint configuration has validation issues (this is expected for placeholders)", "error", err)
-	}
 
 	logger.Info("Marshalling configuration to TOML...")
 	tomlBytes, err := toml.Marshal(blueprintCfg)
