@@ -190,4 +190,3 @@ func (h *CertRenewalHandler) saveCertificateHistory(resource *certificate.Resour
 	return nil
 }
 
-// Removed certificateNeedsRenewal method as the trigger logic is simplified.
