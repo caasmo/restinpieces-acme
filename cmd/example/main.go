@@ -16,13 +16,6 @@ const JobTypeCertRenewal = "certificate_renewal"
 // Pool creation helpers moved to restinpieces package
 
 func main() {
-	// --- Setup Logging ---
-	// Configure slog globally (optional, but good practice)
-	logLevel := slog.LevelInfo
-	if os.Getenv("LOG_LEVEL") == "debug" {
-		logLevel = slog.LevelDebug
-	}
-
 	dbPath := flag.String("db", "", "Path to the SQLite DB (used by framework AND acme history)")
 	ageKeyPath := flag.String("age-key", "", "Path to the age identity (private key) file (required)")
 
