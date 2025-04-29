@@ -1,5 +1,7 @@
 package acme 
 
+package acme
+
 import (
 	"context"
 	"crypto"
@@ -12,7 +14,7 @@ import (
 
 	"github.com/caasmo/restinpieces/config"
 	rip_queue "github.com/caasmo/restinpieces/queue"
-	"github.com/pelletier/go-toml/v2" // Import TOML library
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/go-acme/lego/v4/certcrypto"
 	"github.com/go-acme/lego/v4/certificate"
@@ -21,11 +23,12 @@ import (
 	"github.com/go-acme/lego/v4/lego"
 	"github.com/go-acme/lego/v4/providers/dns/cloudflare"
 	"github.com/go-acme/lego/v4/registration"
+	"github.com/go-acme/lego/v4/registration"
 )
 
 const (
 	ConfigScope            = "acme_config"
-	CertificateOutputScope = "certificate_output" // Scope for saving the obtained cert+key
+	CertificateOutputScope = "certificate_output"
 	DNSProviderCloudflare  = "cloudflare"
 )
 
@@ -39,24 +42,20 @@ type Config struct {
 	Domains               []string
 	DNSProviders          map[string]DNSProvider // Map provider name (e.g., "cloudflare") to its config
 	CADirectoryURL        string
-	AcmeAccountPrivateKey string // PEM format
+	AcmeAccountPrivateKey string
 }
 
-// CertificateOutput defines the structure for the TOML config to be saved.
 type CertificateOutput struct {
 	CertificateChain string `toml:"certificate_chain"`
 	PrivateKey       string `toml:"private_key"`
 }
 
-// CertRenewalHandler handles the job for renewing TLS certificates.
 type CertRenewalHandler struct {
-	config            *Config // Use Config defined in this package
+	config            *Config
 	secureConfigStore config.SecureConfigStore
 	logger            *slog.Logger
 }
 
-// NewCertRenewalHandler creates a new handler instance.
-// It requires the renewal configuration, a secure config store, and a logger.
 func NewCertRenewalHandler(cfg *Config, store config.SecureConfigStore, logger *slog.Logger) *CertRenewalHandler {
 	if cfg == nil || store == nil || logger == nil {
 		panic("NewCertRenewalHandler: received nil config, store, or logger")
@@ -64,7 +63,7 @@ func NewCertRenewalHandler(cfg *Config, store config.SecureConfigStore, logger *
 	return &CertRenewalHandler{
 		config:            cfg,
 		secureConfigStore: store,
-		logger:            logger.With("job_handler", "cert_renewal"), // Add context
+		logger:            logger.With("job_handler", "cert_renewal"),
 	}
 }
 
@@ -174,9 +173,7 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 	}
 	h.logger.Info("Successfully obtained certificate", "domains", request.Domains, "certificate_url", resource.CertURL)
 
-	// --- Save Certificate Configuration ---
 	if err := h.saveCertificateConfig(resource, h.logger); err != nil {
-		// Error is already logged by saveCertificateConfig
 		return err
 	}
 
@@ -184,23 +181,18 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 	return nil
 }
 
-// saveCertificateConfig saves the obtained certificate and private key to the SecureConfigStore.
 func (h *CertRenewalHandler) saveCertificateConfig(resource *certificate.Resource, logger *slog.Logger) error {
-	// 1. Prepare the data structure for TOML marshalling
 	outputData := CertificateOutput{
 		CertificateChain: string(resource.Certificate),
 		PrivateKey:       string(resource.PrivateKey),
 	}
 
-	// 2. Marshal the data to TOML
 	tomlBytes, err := toml.Marshal(outputData)
 	if err != nil {
 		logger.Error("Failed to marshal certificate output to TOML", "error", err)
 		return fmt.Errorf("failed to marshal certificate output to TOML: %w", err)
 	}
 
-	// 3. Determine description
-	// Parse the certificate to get expiry date for the description
 	var expiryStr string
 	block, _ := pem.Decode(resource.Certificate)
 	if block != nil {
@@ -219,12 +211,10 @@ func (h *CertRenewalHandler) saveCertificateConfig(resource *certificate.Resourc
 		description += fmt.Sprintf(" (expires %s)", expiryStr)
 	}
 
-	// 4. Save using SecureConfigStore
 	logger.Info("Saving obtained certificate configuration", "scope", CertificateOutputScope, "format", "toml")
 	err = h.secureConfigStore.Save(CertificateOutputScope, tomlBytes, "toml", description)
 	if err != nil {
 		logger.Error("Failed to save certificate config via SecureConfigStore", "scope", CertificateOutputScope, "error", err)
-		// Don't wrap here, Save should provide enough context
 		return err
 	}
 

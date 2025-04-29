@@ -9,11 +9,8 @@ import (
 	"github.com/caasmo/restinpieces"
 
 	"github.com/caasmo/restinpieces-acme"
-	// acme_db "github.com/caasmo/restinpieces-acme/zombiezen" // Removed db writer import
 	"github.com/pelletier/go-toml/v2"
 )
-
-// Define job type constant for clarity
 const JobTypeCertRenewal = "certificate_renewal"
 
 // Pool creation helpers moved to restinpieces package
@@ -90,11 +87,8 @@ func main() {
 	}
 	logger.Info("Successfully unmarshalled ACME config", "scope", acme.ConfigScope)
 
-	// --- Instantiate and Register ACME Handler ---
-	// Pass the loaded renewalCfg and the app's SecureConfigStore
 	certHandler := acme.NewCertRenewalHandler(&renewalCfg, app.SecureConfigStore(), logger)
 
-	// Register the handler with the framework's server instance
 	err = srv.AddJobHandler(JobTypeCertRenewal, certHandler)
 	if err != nil {
 		logger.Error("Failed to register certificate renewal job handler", "job_type", JobTypeCertRenewal, "error", err)
