@@ -51,8 +51,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	var renewalCfg acme.Config
-
 	// --- Create Database Pool (Shared by framework and ACME history) ---
 	dbPool, err := restinpieces.NewZombiezenPool(*dbPath) // Use dbPath
 	if err != nil {
@@ -68,27 +66,45 @@ func main() {
 	}()
 
 	// --- Initialize restinpieces Framework ---
-	// Pass ageKeyPath as the first argument
 	app, srv, err := restinpieces.New(
-		*ageKeyPath,                          // Framework needs this for its own config
-		restinpieces.WithDbZombiezen(dbPool), // Provide the pool to the framework
+		restinpieces.WithDbZombiezen(dbPool), // Provide the pool
+		restinpieces.WithAgeKeyPath(*ageKeyPath), // Provide age key path
 		restinpieces.WithRouterServeMux(),
 		restinpieces.WithCacheRistretto(),
 		restinpieces.WithTextLogger(nil), // Use default text logger
 	)
 	if err != nil {
 		slog.Error("failed to initialize restinpieces application", "error", err)
-		// Pool will be closed by the deferred function
-		os.Exit(1) // Exit if app initialization fails
+		os.Exit(1) // Pool closed by defer
 	}
+	frameworkLogger := app.Logger() // Get logger from framework
+
+	// --- Load ACME Renewal Config from SecureConfigStore ---
+	frameworkLogger.Info("Loading ACME configuration from database", "scope", acme.ConfigScope)
+	encryptedTomlData, err := app.SecureConfigStore().Latest(acme.ConfigScope)
+	if err != nil {
+		frameworkLogger.Error("failed to load ACME config from DB", "scope", acme.ConfigScope, "error", err)
+		os.Exit(1)
+	}
+	if len(encryptedTomlData) == 0 {
+		frameworkLogger.Error("ACME config data loaded from DB is empty", "scope", acme.ConfigScope)
+		os.Exit(1)
+	}
+
+	var renewalCfg acme.Config // Declare variable to hold the config
+	if err := toml.Unmarshal(encryptedTomlData, &renewalCfg); err != nil {
+		frameworkLogger.Error("failed to unmarshal ACME TOML config", "scope", acme.ConfigScope, "error", err)
+		os.Exit(1)
+	}
+	frameworkLogger.Info("Successfully unmarshalled ACME config", "scope", acme.ConfigScope)
 
 	// --- Setup ACME Dependencies ---
 	// Create the DbWriter implementation instance using the shared pool
 	certDbWriter := acme_db.NewWriter(dbPool)
-	frameworkLogger := app.Logger() // Get logger from framework for consistency
 
 	// --- Instantiate and Register ACME Handler ---
-	certHandler := acme.NewCertRenewalHandler(renewalCfg, certDbWriter, frameworkLogger)
+	// Pass the loaded renewalCfg
+	certHandler := acme.NewCertRenewalHandler(&renewalCfg, certDbWriter, frameworkLogger)
 
 	// Register the handler with the framework's server instance
 	err = srv.AddJobHandler(JobTypeCertRenewal, certHandler)
