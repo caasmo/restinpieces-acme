@@ -6,7 +6,7 @@ import (
 	"log/slog"
 )
 
-type DNSProviderConfig struct {
+type DNSProvider struct {
 	APIToken string
 }
 
@@ -14,7 +14,7 @@ type Config struct {
 	Enabled               bool
 	Email                 string
 	Domains               []string
-	DNSProviders          map[string]DNSProviderConfig
+	DNSProviders          map[string]DNSProvider
 	CADirectoryURL        string
 	AcmeAccountPrivateKey string
 }
@@ -61,7 +61,7 @@ func LoadConfig() (*Config, error) {
 		Enabled: true,
 		Email:   "your-acme-account@example.com",
 		Domains: []string{"your.domain.com", "www.your.domain.com"},
-		DNSProviders: map[string]DNSProviderConfig{
+		DNSProviders: map[string]DNSProvider{
 			"cloudflare": {
 				APIToken: "YOUR_CLOUDFLARE_API_TOKEN_HERE",
 			},
