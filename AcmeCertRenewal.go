@@ -10,18 +10,13 @@ import (
 	"log/slog"
 	"time"
 
-	// Use types from this package directly
-	// "github.com/caasmo/restinpieces-acme" // No need to import self
-
-	// Framework queue types
 	rip_queue "github.com/caasmo/restinpieces/queue"
 
-	// lego imports
 	"github.com/go-acme/lego/v4/certcrypto"
 	"github.com/go-acme/lego/v4/certificate"
 	"github.com/go-acme/lego/v4/challenge/dns01"
 	"github.com/go-acme/lego/v4/lego"
-	"github.com/go-acme/lego/v4/providers/dns/cloudflare" // Keep specific provider for now
+	"github.com/go-acme/lego/v4/providers/dns/cloudflare"
 	"github.com/go-acme/lego/v4/registration"
 )
 
@@ -36,7 +31,6 @@ type CertRenewalHandler struct {
 // It requires the renewal configuration, a database writer, and a logger.
 func NewCertRenewalHandler(cfg *Config, writer Writer, logger *slog.Logger) *CertRenewalHandler {
 	if cfg == nil || writer == nil || logger == nil {
-		// Or handle this more gracefully
 		panic("NewCertRenewalHandler: received nil config, writer, or logger")
 	}
 	return &CertRenewalHandler{
@@ -58,7 +52,6 @@ func (u *AcmeUser) GetRegistration() *registration.Resource { return u.Registrat
 func (u *AcmeUser) GetPrivateKey() crypto.PrivateKey      { return u.PrivateKey }
 
 // Handle executes the certificate renewal logic.
-// The job payload is currently ignored but could be used in the future.
 func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) error {
 	cfg := h.config // Use the handler's config
 
@@ -67,8 +60,6 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 		return nil // Not an error, just disabled by config
 	}
 
-	// Simplified Trigger: Always attempt renewal when job runs.
-	// Assumes the job is triggered manually or scheduled appropriately elsewhere.
 	h.logger.Info("Attempting certificate renewal process", "domains", cfg.Domains)
 
 	// --- Lego Client Setup (using cfg) ---
@@ -76,7 +67,6 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 	acmePrivateKey, err := certcrypto.ParsePEMPrivateKey([]byte(cfg.AcmeAccountPrivateKey))
 	if err != nil {
 		h.logger.Error("Failed to parse ACME account private key from config", "error", err)
-		// Avoid returning raw key data in errors
 		return fmt.Errorf("failed to parse ACME account private key: %w", err)
 	}
 
@@ -108,7 +98,6 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 	}
 
 	// Set DNS challenge provider with a suitable timeout
-	// Consider making the timeout configurable if needed
 	err = legoClient.Challenge.SetDNS01Provider(cfProvider, dns01.AddDNSTimeout(10*time.Minute))
 	if err != nil {
 		h.logger.Error("Failed to set DNS01 provider", "error", err)
@@ -147,11 +136,11 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 	// --- Save Certificate History to Database ---
 	if err := h.saveCertificateHistory(resource, h.logger); err != nil {
 		// Error is already logged by saveCertificateHistory
-		return err // Propagate the error to the job runner
+		return err 
 	}
 
 	h.logger.Info("Successfully processed certificate renewal job.", "domains", request.Domains)
-	return nil // Indicate successful job completion
+	return nil 
 }
 
 // saveCertificateHistory saves the obtained certificate resource to the database history.
