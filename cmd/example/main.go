@@ -26,15 +26,10 @@ func main() {
 	if os.Getenv("LOG_LEVEL") == "debug" {
 		logLevel = slog.LevelDebug
 	}
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
-	slog.SetDefault(logger) // Set globally
 
-	// --- Flags ---
-	// --- Framework Flags ---
 	dbPath := flag.String("db", "", "Path to the SQLite DB (used by framework AND acme history)")
 	ageKeyPath := flag.String("age-key", "", "Path to the age identity (private key) file (required)")
 
-	// Set custom usage message for the application
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s -db <db-path> -age-key <id-path>\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Start the restinpieces application server with ACME support.\n\n")
@@ -42,10 +37,8 @@ func main() {
 		flag.PrintDefaults()
 	}
 
-	// Parse flags
 	flag.Parse()
 
-	// Validate required flags
 	if *dbPath == "" || *ageKeyPath == "" {
 		flag.Usage()
 		os.Exit(1)
@@ -57,7 +50,7 @@ func main() {
 		slog.Error("failed to create database pool", "path", *dbPath, "error", err)
 		os.Exit(1) // Exit if pool creation fails
 	}
-	// Defer closing the pool here, as main owns it now.
+
 	defer func() {
 		slog.Info("Closing database pool...")
 		if err := dbPool.Close(); err != nil {
@@ -65,7 +58,7 @@ func main() {
 		}
 	}()
 
-	// --- Initialize restinpieces Framework ---
+	// --- Initialize restinpieces ---
 	app, srv, err := restinpieces.New(
 		restinpieces.WithDbZombiezen(dbPool), // Provide the pool
 		restinpieces.WithAgeKeyPath(*ageKeyPath), // Provide age key path
