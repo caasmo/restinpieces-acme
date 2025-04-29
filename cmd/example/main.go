@@ -90,11 +90,7 @@ func main() {
 	logger.Info("Registered certificate renewal job handler", "job_type", JobTypeCertRenewal)
 
 
-	// --- Start Server ---
-	// The Run method blocks until the server stops (e.g., via signal).
-	// It manages the lifecycle of registered daemons (like the scheduler).
 	srv.Run()
 
 	slog.Info("Server shut down gracefully.")
-	// No explicit os.Exit(0) needed, successful completion implies exit 0
 }
