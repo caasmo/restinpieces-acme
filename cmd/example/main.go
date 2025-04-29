@@ -19,15 +19,11 @@ const JobTypeCertRenewal = "certificate_renewal"
 // Pool creation helpers moved to restinpieces package
 
 func main() {
-	// --- Framework Flags ---
-	dbPath := flag.String("db", "", "Path to the SQLite DB (used by framework AND acme history)")
-	ageKeyPath := flag.String("age-key", "", "Path to the age identity (private key) file (required)")
+	"github.com/pelletier/go-toml/v2" // Import TOML library
+)
 
-	// Set custom usage message for the application
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s -db <database-path> -age-key <identity-file-path>\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Start the restinpieces application server.\n\n")
-		fmt.Fprintf(os.Stderr, "Flags:\n")
+// Define job type constant for clarity
+const JobTypeCertRenewal = "certificate_renewal"
 		flag.PrintDefaults()
 	}
 
@@ -35,19 +31,45 @@ func main() {
 	flag.Parse()
 
 	// Validate required flags
-	if *dbPath == "" || *ageKeyPath == "" {
+	if *dbPath == "" || *ageKeyPath == "" || *acmeConfigPath == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	// --- Create the Database Pool ---
-	// --- Load ACME Renewal Config (Hardcoded for now) ---
-	// This loads the configuration specific to the ACME renewal process.
-	renewalCfg, err := acme.LoadConfig() // Load config from acme package
+	// --- Load ACME Renewal Config from File ---
+	slog.Info("Loading ACME renewal configuration", "path", *acmeConfigPath)
+	acmeCfgBytes, err := os.ReadFile(*acmeConfigPath)
 	if err != nil {
-		slog.Error("Failed to load ACME renewal configuration", "error", err)
+		slog.Error("Failed to read ACME configuration file", "path", *acmeConfigPath, "error", err)
 		os.Exit(1)
 	}
+
+	var renewalCfg acme.Config
+	err = toml.Unmarshal(acmeCfgBytes, &renewalCfg)
+	if err != nil {
+		slog.Error("Failed to parse ACME configuration TOML", "path", *acmeConfigPath, "error", err)
+		os.Exit(1)
+	}
+
+	// Validate the loaded ACME config
+	if err := renewalCfg.Validate(); err != nil {
+		slog.Error("Invalid ACME renewal configuration loaded from file", "path", *acmeConfigPath, "error", err)
+		os.Exit(1)
+	}
+	slog.Info("ACME renewal configuration loaded and validated successfully")
+	// Note: Add logic here to replace placeholders in renewalCfg (e.g., API tokens, keys)
+	// with values from environment variables or a secret management system.
+	// Example:
+	// if token := os.Getenv("CLOUDFLARE_API_TOKEN"); token != "" {
+	//     if provider, ok := renewalCfg.DNSProviders["cloudflare"]; ok {
+	//         provider.APIToken = token
+	//         renewalCfg.DNSProviders["cloudflare"] = provider // Update map value
+	//     }
+	// }
+	// if key := os.Getenv("ACME_ACCOUNT_PRIVATE_KEY"); key != "" {
+	//     renewalCfg.AcmeAccountPrivateKey = key
+	// }
+	// Re-validate after potential modifications if necessary.
 
 	// --- Create Database Pool (Shared by framework and ACME history) ---
 	// Use the helper from the library to create a pool with suitable defaults.
