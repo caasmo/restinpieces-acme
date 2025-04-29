@@ -11,6 +11,7 @@ import (
 
 	"github.com/caasmo/restinpieces-acme"
 	acme_db "github.com/caasmo/restinpieces-acme/zombiezen"
+	"github.com/pelletier/go-toml/v2" // Import TOML library
 )
 
 // Define job type constant for clarity
@@ -19,11 +20,26 @@ const JobTypeCertRenewal = "certificate_renewal"
 // Pool creation helpers moved to restinpieces package
 
 func main() {
-	"github.com/pelletier/go-toml/v2" // Import TOML library
-)
+	// --- Setup Logging ---
+	// Configure slog globally (optional, but good practice)
+	logLevel := slog.LevelInfo
+	if os.Getenv("LOG_LEVEL") == "debug" {
+		logLevel = slog.LevelDebug
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
+	slog.SetDefault(logger) // Set globally
 
-// Define job type constant for clarity
-const JobTypeCertRenewal = "certificate_renewal"
+	// --- Flags ---
+	// --- Framework Flags ---
+	dbPath := flag.String("db", "", "Path to the SQLite DB (used by framework AND acme history)")
+	ageKeyPath := flag.String("age-key", "", "Path to the age identity (private key) file (required)")
+	acmeConfigPath := flag.String("acme-config", "", "Path to the ACME configuration TOML file (required)")
+
+	// Set custom usage message for the application
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s -db <db-path> -age-key <id-path> -acme-config <acme-cfg-path>\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Start the restinpieces application server with ACME support.\n\n")
+		fmt.Fprintf(os.Stderr, "Flags:\n")
 		flag.PrintDefaults()
 	}
 
