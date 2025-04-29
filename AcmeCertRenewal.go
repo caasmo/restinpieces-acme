@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-acme/lego/v4/certcrypto"
 	"github.com/go-acme/lego/v4/certificate"
+	"github.com/go-acme/lego/v4/challenge" // Import for ChallengeProvider interface
 	"github.com/go-acme/lego/v4/challenge/dns01"
 	"github.com/go-acme/lego/v4/lego"
 	"github.com/go-acme/lego/v4/providers/dns/cloudflare"
@@ -111,13 +112,15 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 		return err
 	}
 
-	var dnsProvider lego.ChallengeProvider // Use interface type
+	var dnsProvider challenge.Provider // Use interface type from imported package
+	var err error                      // Declare err for use inside switch cases
 	switch providerName {
 	case DNSProviderCloudflare:
 		cfLegoConfig := cloudflare.NewDefaultConfig()
 		cfLegoConfig.AuthToken = providerConfig.APIToken // Get token from the map value
 		// Add other CF config if needed (AuthEmail, AuthKey, ZoneToken etc.) based on your auth method
 
+		var cfProvider *cloudflare.DNSProvider // Declare cfProvider here
 		cfProvider, err = cloudflare.NewDNSProviderConfig(cfLegoConfig)
 		if err != nil {
 			h.logger.Error("Failed to create Cloudflare DNS provider", "error", err)
