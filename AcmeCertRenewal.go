@@ -45,7 +45,7 @@ type Config struct {
 // Note: TOML tags are not strictly needed here as we marshal the whole struct.
 type Cert struct {
 	Identifier       string    // Identifier for the cert request (e.g., primary domain)
-	Domains          string    // JSON array of all domains covered
+	Domains          []string  // List of all domains covered
 	CertificateChain string    // PEM encoded certificate chain
 	PrivateKey       string    // PEM encoded private key for the cert (Sensitive!)
 	IssuedAt         time.Time // UTC timestamp of issuance
@@ -198,18 +198,10 @@ func (h *CertRenewalHandler) saveCertificate(resource *certificate.Resource, log
 		return err
 	}
 
-	// 2. Prepare domains list as JSON string (using the domains from the config used for this request)
-	domainsJSON, err := json.Marshal(h.config.Domains)
-	if err != nil {
-		err = fmt.Errorf("failed to marshal domains %v to JSON: %w", h.config.Domains, err)
-		logger.Error(err.Error())
-		return err
-	}
-
-	// 3. Create the Cert struct
+	// 2. Create the Cert struct
 	certData := Cert{
-		Identifier:       resource.Domain, // Use primary domain from resource as identifier
-		Domains:          string(domainsJSON),
+		Identifier:       resource.Domain,          // Use primary domain from resource as identifier
+		Domains:          h.config.Domains,         // Assign the slice directly
 		CertificateChain: string(resource.Certificate), // Full PEM chain
 		PrivateKey:       string(resource.PrivateKey),  // Corresponding PEM private key
 		IssuedAt:         cert.NotBefore.UTC(),         // Use parsed cert's NotBefore
