@@ -1,4 +1,4 @@
-package acme // Or root package of your module
+package acme 
 
 import (
 	"context"
@@ -167,7 +167,7 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 	h.logger.Info("Successfully obtained certificate", "domains", request.Domains, "certificate_url", resource.CertURL)
 
 	// --- Save Certificate History to Database ---
-	if err := h.saveCertificateHistory(resource, h.logger); err != nil {
+	if err := h.saveCertificate(resource, h.logger); err != nil {
 		// Error is already logged by saveCertificateHistory
 		return err
 	}
@@ -176,8 +176,8 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 	return nil
 }
 
-// saveCertificateHistory saves the obtained certificate resource to the database history.
-func (h *CertRenewalHandler) saveCertificateHistory(resource *certificate.Resource, logger *slog.Logger) error {
+// saveCertificate saves the obtained certificate resource 
+func (h *CertRenewalHandler) saveCertificate(resource *certificate.Resource, logger *slog.Logger) error {
 	// 1. Parse the certificate to get expiry and issue dates
 	block, _ := pem.Decode(resource.Certificate)
 	if block == nil {
