@@ -79,6 +79,8 @@ type AcmeUser struct {
 
 func (u *AcmeUser) GetEmail() string                        { return u.Email }
 func (u *AcmeUser) GetRegistration() *registration.Resource { return u.Registration }
+// openssl genpkey -algorithm Ed25519 -out acme_account_ed25519.key
+//  It's fully supported and often preferred for its modern design.
 func (u *AcmeUser) GetPrivateKey() crypto.PrivateKey        { return u.PrivateKey }
 
 // Handle executes the certificate renewal logic.
