@@ -7,11 +7,10 @@ import (
 	"os"
 
 	"github.com/caasmo/restinpieces"
-	// rip_queue "github.com/caasmo/restinpieces/queue" // Removed unused import
 
 	"github.com/caasmo/restinpieces-acme"
-	acme_db "github.com/caasmo/restinpieces-acme/zombiezen"
-	"github.com/pelletier/go-toml/v2" // Import TOML library
+	// acme_db "github.com/caasmo/restinpieces-acme/zombiezen" // Removed db writer import
+	"github.com/pelletier/go-toml/v2"
 )
 
 // Define job type constant for clarity
@@ -91,13 +90,9 @@ func main() {
 	}
 	logger.Info("Successfully unmarshalled ACME config", "scope", acme.ConfigScope)
 
-	// --- Setup ACME Dependencies ---
-	// Create the DbWriter implementation instance using the shared pool
-	certDbWriter := acme_db.NewWriter(dbPool)
-
 	// --- Instantiate and Register ACME Handler ---
-	// Pass the loaded renewalCfg
-	certHandler := acme.NewCertRenewalHandler(&renewalCfg, certDbWriter, logger)
+	// Pass the loaded renewalCfg and the app's SecureConfigStore
+	certHandler := acme.NewCertRenewalHandler(&renewalCfg, app.SecureConfigStore(), logger)
 
 	// Register the handler with the framework's server instance
 	err = srv.AddJobHandler(JobTypeCertRenewal, certHandler)

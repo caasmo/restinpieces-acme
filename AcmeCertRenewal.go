@@ -4,13 +4,15 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
+	"github.com/caasmo/restinpieces/config"
 	rip_queue "github.com/caasmo/restinpieces/queue"
+	"github.com/pelletier/go-toml/v2" // Import TOML library
 
 	"github.com/go-acme/lego/v4/certcrypto"
 	"github.com/go-acme/lego/v4/certificate"
@@ -39,24 +41,29 @@ type Config struct {
 	AcmeAccountPrivateKey string // PEM format
 }
 
+// CertificateOutput defines the structure for the TOML config to be saved.
+type CertificateOutput struct {
+	CertificateChain string `toml:"certificate_chain"`
+	PrivateKey       string `toml:"private_key"`
+}
 
 // CertRenewalHandler handles the job for renewing TLS certificates.
 type CertRenewalHandler struct {
-	config   *Config // Use Config defined in this package
-	dbWriter Writer  // Use Writer interface defined in this package
-	logger   *slog.Logger
+	config            *Config // Use Config defined in this package
+	secureConfigStore config.SecureConfigStore
+	logger            *slog.Logger
 }
 
 // NewCertRenewalHandler creates a new handler instance.
-// It requires the renewal configuration, a database writer, and a logger.
-func NewCertRenewalHandler(cfg *Config, writer Writer, logger *slog.Logger) *CertRenewalHandler {
-	if cfg == nil || writer == nil || logger == nil {
-		panic("NewCertRenewalHandler: received nil config, writer, or logger")
+// It requires the renewal configuration, a secure config store, and a logger.
+func NewCertRenewalHandler(cfg *Config, store config.SecureConfigStore, logger *slog.Logger) *CertRenewalHandler {
+	if cfg == nil || store == nil || logger == nil {
+		panic("NewCertRenewalHandler: received nil config, store, or logger")
 	}
 	return &CertRenewalHandler{
-		config:   cfg,
-		dbWriter: writer,
-		logger:   logger.With("job_handler", "cert_renewal"), // Add context
+		config:            cfg,
+		secureConfigStore: store,
+		logger:            logger.With("job_handler", "cert_renewal"), // Add context
 	}
 }
 
@@ -166,9 +173,9 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 	}
 	h.logger.Info("Successfully obtained certificate", "domains", request.Domains, "certificate_url", resource.CertURL)
 
-	// --- Save Certificate History to Database ---
-	if err := h.saveCertificate(resource, h.logger); err != nil {
-		// Error is already logged by saveCertificateHistory
+	// --- Save Certificate Configuration ---
+	if err := h.saveCertificateConfig(resource, h.logger); err != nil {
+		// Error is already logged by saveCertificateConfig
 		return err
 	}
 
@@ -176,49 +183,50 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job rip_queue.Job) erro
 	return nil
 }
 
-// saveCertificate saves the obtained certificate resource 
-func (h *CertRenewalHandler) saveCertificate(resource *certificate.Resource, logger *slog.Logger) error {
-	// 1. Parse the certificate to get expiry and issue dates
+// saveCertificateConfig saves the obtained certificate and private key to the SecureConfigStore.
+func (h *CertRenewalHandler) saveCertificateConfig(resource *certificate.Resource, logger *slog.Logger) error {
+	// 1. Prepare the data structure for TOML marshalling
+	outputData := CertificateOutput{
+		CertificateChain: string(resource.Certificate),
+		PrivateKey:       string(resource.PrivateKey),
+	}
+
+	// 2. Marshal the data to TOML
+	tomlBytes, err := toml.Marshal(outputData)
+	if err != nil {
+		logger.Error("Failed to marshal certificate output to TOML", "error", err)
+		return fmt.Errorf("failed to marshal certificate output to TOML: %w", err)
+	}
+
+	// 3. Determine description
+	// Parse the certificate to get expiry date for the description
+	var expiryStr string
 	block, _ := pem.Decode(resource.Certificate)
-	if block == nil {
-		err := fmt.Errorf("failed to decode PEM block from obtained certificate chain")
-		logger.Error(err.Error(), "domain", resource.Domain)
+	if block != nil {
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err == nil {
+			expiryStr = cert.NotAfter.UTC().Format(time.RFC3339)
+		} else {
+			logger.Warn("Could not parse certificate to get expiry for description", "error", err)
+		}
+	} else {
+		logger.Warn("Could not decode PEM block to get expiry for description")
+	}
+
+	description := fmt.Sprintf("Obtained certificate for domains: %s", strings.Join(h.config.Domains, ", "))
+	if expiryStr != "" {
+		description += fmt.Sprintf(" (expires %s)", expiryStr)
+	}
+
+	// 4. Save using SecureConfigStore
+	logger.Info("Saving obtained certificate configuration", "scope", CertificateOutputScope, "format", "toml")
+	err = h.secureConfigStore.Save(CertificateOutputScope, tomlBytes, "toml", description)
+	if err != nil {
+		logger.Error("Failed to save certificate config via SecureConfigStore", "scope", CertificateOutputScope, "error", err)
+		// Don't wrap here, Save should provide enough context
 		return err
 	}
-	cert, err := x509.ParseCertificate(block.Bytes) // Parse the leaf certificate
-	if err != nil {
-		err = fmt.Errorf("failed to parse obtained leaf certificate: %w", err)
-		logger.Error(err.Error(), "domain", resource.Domain)
-		return err
-	}
 
-	// 2. Prepare domains list as JSON string (using the domains from the config used for this request)
-	domainsJSON, err := json.Marshal(h.config.Domains)
-	if err != nil {
-		// This should ideally not happen if config validation passed
-		err = fmt.Errorf("failed to marshal domains %v to JSON: %w", h.config.Domains, err)
-		logger.Error(err.Error())
-		return err
-	}
-
-	// 3. Create the Cert struct for database insertion (use directly)
-	dbCert := Cert{
-		Identifier:       resource.Domain, // Use primary domain from resource as identifier
-		Domains:          string(domainsJSON),
-		CertificateChain: string(resource.Certificate), // Full PEM chain
-		PrivateKey:       string(resource.PrivateKey),  // Corresponding PEM private key (Sensitive!)
-		IssuedAt:         cert.NotBefore.UTC(),         // Use parsed cert's NotBefore
-		ExpiresAt:        cert.NotAfter.UTC(),          // Use parsed cert's NotAfter
-	}
-
-	// 4. Call AddCert via the dbWriter interface
-	err = h.dbWriter.AddCert(dbCert)
-	if err != nil {
-		// Log the failure, error is already wrapped by the db layer
-		logger.Error("Failed to add certificate record to history database", "identifier", dbCert.Identifier, "error", err)
-		return err // Return the error from the db layer
-	}
-
-	logger.Info("Successfully added certificate record to history database", "identifier", dbCert.Identifier, "expiry", dbCert.ExpiresAt.Format(time.RFC3339))
+	logger.Info("Successfully saved certificate configuration", "scope", CertificateOutputScope)
 	return nil
 }
