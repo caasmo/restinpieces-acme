@@ -2,11 +2,11 @@ package acme // Or root package of your module
 
 import (
 	"context"
-	"errors" // Added for potential future validation
 	"crypto"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors" // Added for potential future validation
 	"fmt"
 	"log/slog"
 	"time"
