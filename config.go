@@ -11,7 +11,6 @@ type DNSProvider struct {
 }
 
 type Config struct {
-	Enabled               bool
 	Email                 string
 	Domains               []string
 	DNSProviders          map[string]DNSProvider
@@ -20,17 +19,14 @@ type Config struct {
 }
 
 func (c *Config) Validate() error {
-	if !c.Enabled {
-		return nil
-	}
 	if c.Email == "" {
-		return errors.New("config: email cannot be empty when enabled")
+		return errors.New("config: email cannot be empty")
 	}
 	if len(c.Domains) == 0 {
-		return errors.New("config: domains cannot be empty when enabled")
+		return errors.New("config: domains cannot be empty")
 	}
 	if len(c.DNSProviders) == 0 {
-		return errors.New("config: dns_providers cannot be empty when enabled")
+		return errors.New("config: dns_providers cannot be empty")
 	}
 	for providerName, providerCfg := range c.DNSProviders {
 		switch providerName {
@@ -43,11 +39,11 @@ func (c *Config) Validate() error {
 		}
 	}
 	if c.AcmeAccountPrivateKey == "" {
-		return errors.New("config: acme_account_private_key cannot be empty when enabled")
+		return errors.New("config: acme_account_private_key cannot be empty")
 	}
 	if c.CADirectoryURL == "" {
 		// Defaulting might be an option, but explicit is better
-		return errors.New("config: ca_directory_url cannot be empty when enabled")
+		return errors.New("config: ca_directory_url cannot be empty")
 	}
 
 	// Add more checks as needed (e.g., URL format, key format basic check)
@@ -58,7 +54,6 @@ func (c *Config) Validate() error {
 func LoadConfig() (*Config, error) {
 
 	cfg := &Config{
-		Enabled: true,
 		Email:   "your-acme-account@example.com",
 		Domains: []string{"your.domain.com", "www.your.domain.com"},
 		DNSProviders: map[string]DNSProvider{
@@ -81,7 +76,7 @@ func LoadConfig() (*Config, error) {
 	for k := range cfg.DNSProviders {
 		providerNames = append(providerNames, k)
 	}
-	slog.Info("ACME renewal configuration loaded and validated successfully", "enabled", cfg.Enabled, "email", cfg.Email, "domains", cfg.Domains, "providers", providerNames, "ca_url", cfg.CADirectoryURL)
+	slog.Info("ACME renewal configuration loaded and validated successfully", "email", cfg.Email, "domains", cfg.Domains, "providers", providerNames, "ca_url", cfg.CADirectoryURL)
 
 	placeholderSecretDetected := false
 	if providerCfg, ok := cfg.DNSProviders["cloudflare"]; ok && providerCfg.APIToken == "YOUR_CLOUDFLARE_API_TOKEN_HERE" {

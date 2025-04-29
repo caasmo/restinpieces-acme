@@ -48,11 +48,6 @@ func main() {
 		slog.Error("Failed to load ACME renewal configuration", "error", err)
 		os.Exit(1)
 	}
-	// Optional: Check renewalCfg.Enabled early if you want to avoid setting up DB etc.
-	// if !renewalCfg.Enabled {
-	//     slog.Info("ACME renewal is disabled via configuration. Exiting.")
-	//     os.Exit(0)
-	// }
 
 	// --- Create Database Pool (Shared by framework and ACME history) ---
 	// Use the helper from the library to create a pool with suitable defaults.
@@ -90,26 +85,21 @@ func main() {
 	frameworkLogger := app.Logger() // Get logger from framework for consistency
 
 	// --- Instantiate and Register ACME Handler ---
-	// Only register the handler if ACME renewal is enabled in its specific config.
-	if renewalCfg.Enabled {
-		certHandler := acme.NewCertRenewalHandler(renewalCfg, certDbWriter, frameworkLogger)
+	certHandler := acme.NewCertRenewalHandler(renewalCfg, certDbWriter, frameworkLogger)
 
-		// Register the handler with the framework's server instance
-		err = srv.AddJobHandler(JobTypeCertRenewal, certHandler)
-		if err != nil {
-			frameworkLogger.Error("Failed to register certificate renewal job handler", "job_type", JobTypeCertRenewal, "error", err)
-			os.Exit(1)
-		}
-		frameworkLogger.Info("Registered certificate renewal job handler", "job_type", JobTypeCertRenewal)
-
-		// Reminder: This setup registers the handler, but doesn't automatically
-		// schedule the JobTypeCertRenewal job. That needs a separate mechanism:
-		// - A manual trigger (API call, CLI command to enqueue the job)
-		// - A dedicated scheduler daemon added via srv.AddDaemon()
-		// - Integration with an external scheduler.
-	} else {
-		frameworkLogger.Info("ACME renewal handler not registered (disabled in its config)")
+	// Register the handler with the framework's server instance
+	err = srv.AddJobHandler(JobTypeCertRenewal, certHandler)
+	if err != nil {
+		frameworkLogger.Error("Failed to register certificate renewal job handler", "job_type", JobTypeCertRenewal, "error", err)
+		os.Exit(1)
 	}
+	frameworkLogger.Info("Registered certificate renewal job handler", "job_type", JobTypeCertRenewal)
+
+	// Reminder: This setup registers the handler, but doesn't automatically
+	// schedule the JobTypeCertRenewal job. That needs a separate mechanism:
+	// - A manual trigger (API call, CLI command to enqueue the job)
+	// - A dedicated scheduler daemon added via srv.AddDaemon()
+	// - Integration with an external scheduler.
 
 	// PreRouter initialization is handled internally within restinpieces.New
 
