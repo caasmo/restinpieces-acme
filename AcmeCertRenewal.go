@@ -206,19 +206,7 @@ func getDNSProvider(providerName string, providerConfig DNSProvider, logger *slo
 			logger.Error("Failed to create Cloudflare DNS provider", "error", err)
 			return nil, fmt.Errorf("failed to create Cloudflare provider: %w", err)
 		}
-		dnsProvider = cfProvider // Assign to the interface variable
-	// Add cases for other providers here
-	// case "route53":
-	// 	// Example: configure Route53 provider
-	// 	r53Config := route53.NewDefaultConfig()
-	// 	r53Config.AccessKeyID = providerConfig.AccessKeyID // Assuming these fields exist in DNSProvider struct
-	// 	r53Config.SecretAccessKey = providerConfig.SecretAccessKey
-	// 	r53Config.Region = providerConfig.Region
-	// 	dnsProvider, err = route53.NewDNSProviderConfig(r53Config)
-	// 	if err != nil {
-	// 		logger.Error("Failed to create Route53 DNS provider", "error", err)
-	// 		return nil, fmt.Errorf("failed to create Route53 provider: %w", err)
-	// 	}
+		dnsProvider = cfProvider 
 	default:
 		err := fmt.Errorf("unsupported DNS provider configured: %q", providerName)
 		logger.Error(err.Error())
