@@ -35,6 +35,9 @@ type DNSProvider struct {
 }
 
 type Config struct {
+    // used by Let's Encrypt (the ACME CA) primarily for notifications. They
+    // will send reminders about certificate expiry and potentially other
+    // important account notices
 	Email                 string
     // Obtaining wildcard certificates (e.g., *.example.com) requires using the
     // dns-01 challenge type. ACME best practices (and Let's Encrypt's policy)
