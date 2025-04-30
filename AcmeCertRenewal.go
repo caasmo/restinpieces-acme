@@ -29,31 +29,30 @@ const (
 	DNSProviderCloudflare  = "cloudflare"
 )
 
-
 type DNSProvider struct {
 	APIToken string
 }
 
 type Config struct {
-    // used by Let's Encrypt (the ACME CA) primarily for notifications. They
-    // will send reminders about certificate expiry and potentially other
-    // important account notices
-	Email                 string
-    // Obtaining wildcard certificates (e.g., *.example.com) requires using the
-    // dns-01 challenge type. ACME best practices (and Let's Encrypt's policy)
-    // require you to also include the base domain (example.com) in the same
-    // certificate request Domains = ["example.com", "*.example.com"]
-	Domains               []string
-	DNSProviders          map[string]DNSProvider // Map provider name (e.g., "cloudflare") to its config
-    // The Let's Encrypt staging environment
-    // (https://acme-staging-v02.api.letsencrypt.org/directory) and the
-    // production environment (https://acme-v02.api.letsencrypt.org/directory)
-    // are completely separate. Separate Accounts: An account registered on the
-    // staging environment (identified by your AcmeAccountPrivateKey) is not
-    // recognized by the production environment, and vice-versa. You need to
-    // register your account key on each environment you interact with
+	// used by Let's Encrypt (the ACME CA) primarily for notifications. They
+	// will send reminders about certificate expiry and potentially other
+	// important account notices
+	Email string
+	// Obtaining wildcard certificates (e.g., *.example.com) requires using the
+	// dns-01 challenge type. ACME best practices (and Let's Encrypt's policy)
+	// require you to also include the base domain (example.com) in the same
+	// certificate request Domains = ["example.com", "*.example.com"]
+	Domains      []string
+	DNSProviders map[string]DNSProvider // Map provider name (e.g., "cloudflare") to its config
+	// The Let's Encrypt staging environment
+	// (https://acme-staging-v02.api.letsencrypt.org/directory) and the
+	// production environment (https://acme-v02.api.letsencrypt.org/directory)
+	// are completely separate. Separate Accounts: An account registered on the
+	// staging environment (identified by your AcmeAccountPrivateKey) is not
+	// recognized by the production environment, and vice-versa. You need to
+	// register your account key on each environment you interact with
 	CADirectoryURL        string
-	ActiveDNSProvider     string                 // Name of the provider key in DNSProviders map to use
+	ActiveDNSProvider     string // Name of the provider key in DNSProviders map to use
 	AcmeAccountPrivateKey string
 }
 
@@ -94,9 +93,11 @@ type AcmeUser struct {
 
 func (u *AcmeUser) GetEmail() string                        { return u.Email }
 func (u *AcmeUser) GetRegistration() *registration.Resource { return u.Registration }
+
 // openssl genpkey -algorithm Ed25519 -out acme_account_ed25519.key
-//  It's fully supported and often preferred for its modern design.
-func (u *AcmeUser) GetPrivateKey() crypto.PrivateKey        { return u.PrivateKey }
+//
+//	It's fully supported and often preferred for its modern design.
+func (u *AcmeUser) GetPrivateKey() crypto.PrivateKey { return u.PrivateKey }
 
 // Handle executes the certificate renewal logic.
 func (h *CertRenewalHandler) Handle(ctx context.Context, job db.Job) error {
@@ -209,7 +210,7 @@ func getDNSProvider(providerName string, providerConfig DNSProvider, logger *slo
 			logger.Error("Failed to create Cloudflare DNS provider", "error", err)
 			return nil, fmt.Errorf("failed to create Cloudflare provider: %w", err)
 		}
-		dnsProvider = cfProvider 
+		dnsProvider = cfProvider
 	default:
 		err := fmt.Errorf("unsupported DNS provider configured: %q", providerName)
 		logger.Error(err.Error())
@@ -236,8 +237,8 @@ func (h *CertRenewalHandler) saveCertificate(resource *certificate.Resource, log
 
 	// 2. Create the Cert struct
 	certData := Cert{
-		Identifier:       resource.Domain,          // Use primary domain from resource as identifier
-		Domains:          h.config.Domains,         // Assign the slice directly
+		Identifier:       resource.Domain,              // Use primary domain from resource as identifier
+		Domains:          h.config.Domains,             // Assign the slice directly
 		CertificateChain: string(resource.Certificate), // Full PEM chain
 		PrivateKey:       string(resource.PrivateKey),  // Corresponding PEM private key
 		IssuedAt:         cert.NotBefore.UTC(),         // Use parsed cert's NotBefore

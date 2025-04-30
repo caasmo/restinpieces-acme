@@ -11,8 +11,8 @@ import (
 	"github.com/caasmo/restinpieces"
 	"github.com/caasmo/restinpieces-acme" // Import the local acme package
 	"github.com/caasmo/restinpieces/config"
-	dbz "github.com/caasmo/restinpieces/db/zombiezen" // Import zombiezen db implementation
 	rip_db "github.com/caasmo/restinpieces/db"        // Import db interface package
+	dbz "github.com/caasmo/restinpieces/db/zombiezen" // Import zombiezen db implementation
 	"github.com/pelletier/go-toml/v2"
 )
 

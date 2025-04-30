@@ -11,6 +11,7 @@ import (
 	"github.com/caasmo/restinpieces-acme"
 	"github.com/pelletier/go-toml/v2"
 )
+
 const JobTypeCertRenewal = "certificate_renewal"
 
 // Pool creation helpers moved to restinpieces package
@@ -49,7 +50,7 @@ func main() {
 
 	// --- Initialize restinpieces ---
 	app, srv, err := restinpieces.New(
-		restinpieces.WithDbZombiezen(dbPool), // Provide the pool
+		restinpieces.WithDbZombiezen(dbPool),     // Provide the pool
 		restinpieces.WithAgeKeyPath(*ageKeyPath), // Provide age key path
 		restinpieces.WithRouterServeMux(),
 		restinpieces.WithCacheRistretto(),
@@ -88,7 +89,6 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("Registered certificate renewal job handler", "job_type", JobTypeCertRenewal)
-
 
 	srv.Run()
 
