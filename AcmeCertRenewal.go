@@ -50,6 +50,7 @@ type Config struct {
     // recognized by the production environment, and vice-versa. You need to
     // register your account key on each environment you interact with
 	CADirectoryURL        string
+	ActiveDNSProvider     string                 // Name of the provider key in DNSProviders map to use
 	AcmeAccountPrivateKey string
 }
 
@@ -120,24 +121,26 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job db.Job) error {
 	}
 
 	// --- DNS Provider Setup (using cfg.DNSProviders map) ---
-	// This example assumes only one provider (Cloudflare) is configured,
-	// matching the previous logic but using the new map structure.
-	// A more robust implementation would iterate or select the correct provider.
-    // TODO
-	providerName := DNSProviderCloudflare // Use constant
+	providerName := cfg.ActiveDNSProvider
+	if providerName == "" {
+		err := fmt.Errorf("ActiveDNSProvider field is missing or empty in ACME configuration")
+		h.logger.Error(err.Error())
+		return err
+	}
+	h.logger.Debug("Using configured DNS provider", "provider_name", providerName)
+
 	providerConfig, ok := cfg.DNSProviders[providerName]
 	if !ok {
-		err := fmt.Errorf("required DNS provider '%s' not found in configuration", providerName)
+		err := fmt.Errorf("configured ActiveDNSProvider '%s' not found in DNSProviders map", providerName)
 		h.logger.Error(err.Error())
 		return err
 	}
 
-	var dnsProvider challenge.Provider // Use interface type from imported package
-	// err is already declared earlier in the function scope
+	var dnsProvider challenge.Provider
 	switch providerName {
 	case DNSProviderCloudflare:
 		cfLegoConfig := cloudflare.NewDefaultConfig()
-		cfLegoConfig.AuthToken = providerConfig.APIToken // Get token from the map value
+		cfLegoConfig.AuthToken = providerConfig.APIToken
 		// Add other CF config if needed (AuthEmail, AuthKey, ZoneToken etc.) based on your auth method
 
 		var cfProvider *cloudflare.DNSProvider // Declare cfProvider here

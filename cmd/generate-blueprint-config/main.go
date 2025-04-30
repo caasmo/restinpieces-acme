@@ -20,10 +20,11 @@ func generateBlueprintConfig() acme.Config {
 
 	cfg := acme.Config{
 		Email:                 "your-acme-account@example.com",
-		Domains:               []string{"example.com", "www.example.com"},
+		Domains:               []string{"example.com", "www.example.com"}, // Or ["example.com", "*.example.com"] for wildcard
 		DNSProviders:          dnsProviders,
+		ActiveDNSProvider:     acme.DNSProviderCloudflare, // Specify which provider in the map to use
 		CADirectoryURL:        "https://acme-staging-v02.api.letsencrypt.org/directory",
-		AcmeAccountPrivateKey: `-----BEGIN EC PRIVATE KEY-----\nPASTE_YOUR_ACME_ACCOUNT_PRIVATE_KEY_PEM_HERE\n-----END EC PRIVATE KEY-----`,
+		AcmeAccountPrivateKey: `-----BEGIN PRIVATE KEY-----\nPASTE_YOUR_ACME_ACCOUNT_PRIVATE_KEY_PEM_HERE\n-----END PRIVATE KEY-----`, // Use PRIVATE KEY for broader compatibility
 	}
 
 	return cfg
