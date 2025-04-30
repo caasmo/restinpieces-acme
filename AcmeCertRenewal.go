@@ -164,7 +164,6 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job db.Job) error {
 	}
 	acmeUser.Registration = reg // Store registration details in the temporary user object
 	h.logger.Info("ACME account registered/retrieved successfully", "email", acmeUser.Email, "account_uri", reg.URI)
-	// Note: Registration info (like URI) isn't persisted by this handler between runs.
 
 	// --- Obtain Certificate ---
 	request := certificate.ObtainRequest{
