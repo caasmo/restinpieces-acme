@@ -112,6 +112,7 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job db.Job) error {
 	// This example assumes only one provider (Cloudflare) is configured,
 	// matching the previous logic but using the new map structure.
 	// A more robust implementation would iterate or select the correct provider.
+    // TODO
 	providerName := DNSProviderCloudflare // Use constant
 	providerConfig, ok := cfg.DNSProviders[providerName]
 	if !ok {
