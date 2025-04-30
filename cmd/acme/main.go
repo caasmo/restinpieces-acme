@@ -27,11 +27,11 @@ func main() {
 	logger.Info("Starting ACME certificate renewal runner...")
 
 	// --- Flags ---
-	dbPath := flag.String("dbfile", "app.db", "path to SQLite database file")
+	dbPath := flag.String("dbpath", "app.db", "path to SQLite database file")
 	ageKeyPath := flag.String("age-key", "", "Path to the age identity (private key) file (required)")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s -dbfile <db-path> -age-key <id-path>\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s -dbpath <db-path> -age-key <id-path>\n\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "Runs the ACME certificate renewal process using config from the database.\n\n")
 		fmt.Fprintf(os.Stderr, "Flags:\n")
 		flag.PrintDefaults()
@@ -110,6 +110,6 @@ func main() {
 	}
 
 	logger.Info("Handler execution completed successfully.")
-	logger.Info("Certificate should now be saved in the database via SecureConfigStore.", "db_file", *dbPath, "scope", acme.CertificateOutputScope)
+	logger.Info("Certificate should now be saved in the database via SecureConfigStore.", "db_path", *dbPath, "scope", acme.CertificateOutputScope)
 	logger.Info("You can check the database content using sqlite tools or a config dump command.")
 }
