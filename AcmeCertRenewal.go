@@ -136,27 +136,6 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job db.Job) error {
 		return err
 	}
 
-	var dnsProvider challenge.Provider
-	switch providerName {
-	case DNSProviderCloudflare:
-		cfLegoConfig := cloudflare.NewDefaultConfig()
-		cfLegoConfig.AuthToken = providerConfig.APIToken
-		// Add other CF config if needed (AuthEmail, AuthKey, ZoneToken etc.) based on your auth method
-
-		var cfProvider *cloudflare.DNSProvider // Declare cfProvider here
-		cfProvider, err = cloudflare.NewDNSProviderConfig(cfLegoConfig)
-		if err != nil {
-			h.logger.Error("Failed to create Cloudflare DNS provider", "error", err)
-			return fmt.Errorf("failed to create Cloudflare provider: %w", err)
-		}
-		dnsProvider = cfProvider // Assign to the interface variable
-	// Add cases for other providers here
-	default:
-		err := fmt.Errorf("unsupported DNS provider configured: %q", providerName)
-		h.logger.Error(err.Error())
-		return err
-	}
-
 	// Get the DNS provider instance using the helper function
 	dnsProvider, err := getDNSProvider(providerName, providerConfig, h.logger)
 	if err != nil {
