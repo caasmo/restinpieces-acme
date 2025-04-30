@@ -150,19 +150,21 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job db.Job) error {
 		return fmt.Errorf("failed to set DNS01 provider: %w", err)
 	}
 
-	// --- Register Account (if needed) ---
-	// Lego usually handles checking if registration exists based on the key.
-	// Register needs TermsOfServiceAgreed: true
-	if acmeUser.Registration == nil {
-		reg, err := legoClient.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
-		if err != nil {
-			h.logger.Error("ACME account registration failed", "email", acmeUser.Email, "error", err)
-			return fmt.Errorf("ACME registration failed for %s: %w", acmeUser.Email, err)
-		}
-		acmeUser.Registration = reg
-		h.logger.Info("ACME account registered/retrieved successfully", "email", acmeUser.Email)
-		// Note: Registration info (like URI) isn't persisted by this handler currently.
+	// --- Register/Retrieve ACME Account ---
+	// We call Register on every run. This function is idempotent:
+	// - If the account key is new, it registers a new account with the CA.
+	// - If the account key already exists, it retrieves the existing account details.
+	// Persisting the registration details (acmeUser.Registration) would add complexity
+	// for only minor efficiency gains (saving one network call).
+	// Register needs TermsOfServiceAgreed: true.
+	reg, err := legoClient.Registration.Register(registration.RegisterOptions{TermsOfServiceAgreed: true})
+	if err != nil {
+		h.logger.Error("ACME account registration/retrieval failed", "email", acmeUser.Email, "error", err)
+		return fmt.Errorf("ACME registration/retrieval failed for %s: %w", acmeUser.Email, err)
 	}
+	acmeUser.Registration = reg // Store registration details in the temporary user object
+	h.logger.Info("ACME account registered/retrieved successfully", "email", acmeUser.Email, "account_uri", reg.URI)
+	// Note: Registration info (like URI) isn't persisted by this handler between runs.
 
 	// --- Obtain Certificate ---
 	request := certificate.ObtainRequest{
