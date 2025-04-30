@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/caasmo/restinpieces"
-	"github.com/caasmo/restinpieces-acme" // Import the local acme package
+	"github.com/caasmo/restinpieces-acme"
 	"github.com/caasmo/restinpieces/config"
-	rip_db "github.com/caasmo/restinpieces/db"        // Import db interface package
-	dbz "github.com/caasmo/restinpieces/db/zombiezen" // Import zombiezen db implementation
+	db "github.com/caasmo/restinpieces/db"
+	dbz "github.com/caasmo/restinpieces/db/zombiezen"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -97,7 +97,7 @@ func main() {
 	defer cancel()
 
 	// Create a dummy job (payload is not used by the acme handler)
-	dummyJob := rip_db.Job{ID: 1}
+	dummyJob := db.Job{ID: 1}
 
 	logger.Info("Executing ACME Handle method...")
 	os.Exit(1)
