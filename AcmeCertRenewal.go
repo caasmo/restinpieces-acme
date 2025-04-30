@@ -36,8 +36,19 @@ type DNSProvider struct {
 
 type Config struct {
 	Email                 string
+    // Obtaining wildcard certificates (e.g., *.example.com) requires using the
+    // dns-01 challenge type. ACME best practices (and Let's Encrypt's policy)
+    // require you to also include the base domain (example.com) in the same
+    // certificate request Domains = ["example.com", "*.example.com"]
 	Domains               []string
 	DNSProviders          map[string]DNSProvider // Map provider name (e.g., "cloudflare") to its config
+    // The Let's Encrypt staging environment
+    // (https://acme-staging-v02.api.letsencrypt.org/directory) and the
+    // production environment (https://acme-v02.api.letsencrypt.org/directory)
+    // are completely separate. Separate Accounts: An account registered on the
+    // staging environment (identified by your AcmeAccountPrivateKey) is not
+    // recognized by the production environment, and vice-versa. You need to
+    // register your account key on each environment you interact with
 	CADirectoryURL        string
 	AcmeAccountPrivateKey string
 }
