@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"context"
-	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -102,6 +100,7 @@ func main() {
 	dummyJob := rip_db.Job{ID: 1}
 
 	logger.Info("Executing ACME Handle method...")
+	os.Exit(1)
 	err = renewalHandler.Handle(ctx, dummyJob)
 
 	// --- Result ---
