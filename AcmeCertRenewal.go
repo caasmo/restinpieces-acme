@@ -157,6 +157,13 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job db.Job) error {
 		return err
 	}
 
+	// Get the DNS provider instance using the helper function
+	dnsProvider, err := getDNSProvider(providerName, providerConfig, h.logger)
+	if err != nil {
+		// Error already logged by getDNSProvider or from config checks
+		return err // Return the error directly
+	}
+
 	// Set DNS challenge provider with a suitable timeout
 	err = legoClient.Challenge.SetDNS01Provider(dnsProvider, dns01.AddDNSTimeout(10*time.Minute))
 	if err != nil {
@@ -200,6 +207,46 @@ func (h *CertRenewalHandler) Handle(ctx context.Context, job db.Job) error {
 
 	h.logger.Info("Successfully processed certificate renewal job.", "domains", request.Domains)
 	return nil
+}
+
+// getDNSProvider selects and configures the appropriate lego DNS challenge provider
+// based on the provided name and configuration.
+func getDNSProvider(providerName string, providerConfig DNSProvider, logger *slog.Logger) (challenge.Provider, error) {
+	var dnsProvider challenge.Provider
+	var err error
+
+	switch providerName {
+	case DNSProviderCloudflare:
+		cfLegoConfig := cloudflare.NewDefaultConfig()
+		cfLegoConfig.AuthToken = providerConfig.APIToken
+		// Add other CF config if needed (AuthEmail, AuthKey, ZoneToken etc.) based on your auth method
+
+		var cfProvider *cloudflare.DNSProvider // Declare cfProvider here
+		cfProvider, err = cloudflare.NewDNSProviderConfig(cfLegoConfig)
+		if err != nil {
+			logger.Error("Failed to create Cloudflare DNS provider", "error", err)
+			return nil, fmt.Errorf("failed to create Cloudflare provider: %w", err)
+		}
+		dnsProvider = cfProvider // Assign to the interface variable
+	// Add cases for other providers here
+	// case "route53":
+	// 	// Example: configure Route53 provider
+	// 	r53Config := route53.NewDefaultConfig()
+	// 	r53Config.AccessKeyID = providerConfig.AccessKeyID // Assuming these fields exist in DNSProvider struct
+	// 	r53Config.SecretAccessKey = providerConfig.SecretAccessKey
+	// 	r53Config.Region = providerConfig.Region
+	// 	dnsProvider, err = route53.NewDNSProviderConfig(r53Config)
+	// 	if err != nil {
+	// 		logger.Error("Failed to create Route53 DNS provider", "error", err)
+	// 		return nil, fmt.Errorf("failed to create Route53 provider: %w", err)
+	// 	}
+	default:
+		err := fmt.Errorf("unsupported DNS provider configured: %q", providerName)
+		logger.Error(err.Error())
+		return nil, err
+	}
+
+	return dnsProvider, nil
 }
 
 func (h *CertRenewalHandler) saveCertificate(resource *certificate.Resource, logger *slog.Logger) error {
