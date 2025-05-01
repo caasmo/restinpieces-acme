@@ -24,9 +24,9 @@ import (
 )
 
 const (
-	ConfigScope            = "acme_config"
-	CertificateOutputScope = "certificate_output"
-	DNSProviderCloudflare  = "cloudflare"
+	ConfigScope           = "acme_config"
+	CertificateScope      = "certificate_output" // Scope for saving obtained cert+key
+	DNSProviderCloudflare = "cloudflare"
 )
 
 type DNSProvider struct {
@@ -259,13 +259,13 @@ func (h *CertRenewalHandler) saveCertificate(resource *certificate.Resource, log
 	description := fmt.Sprintf("Obtained certificate for domains: %s (expires %s)", strings.Join(h.config.Domains, ", "), expiryStr)
 
 	// 6. Save using SecureConfigStore
-	logger.Info("Saving obtained certificate configuration", "scope", CertificateOutputScope, "format", "toml", "identifier", certData.Identifier)
-	err = h.secureConfigStore.Save(CertificateOutputScope, tomlBytes, "toml", description)
+	logger.Info("Saving obtained certificate configuration", "scope", CertificateScope, "format", "toml", "identifier", certData.Identifier)
+	err = h.secureConfigStore.Save(CertificateScope, tomlBytes, "toml", description)
 	if err != nil {
-		logger.Error("Failed to save certificate config via SecureConfigStore", "scope", CertificateOutputScope, "error", err)
+		logger.Error("Failed to save certificate config via SecureConfigStore", "scope", CertificateScope, "error", err)
 		return err
 	}
 
-	logger.Info("Successfully saved certificate configuration", "scope", CertificateOutputScope, "identifier", certData.Identifier)
+	logger.Info("Successfully saved certificate configuration", "scope", CertificateScope, "identifier", certData.Identifier)
 	return nil
 }

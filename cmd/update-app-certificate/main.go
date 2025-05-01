@@ -63,23 +63,23 @@ func main() {
 	}
 
 	// --- Load Latest Certificate Data ---
-	logger.Info("Loading latest certificate data", "scope", acme.CertificateOutputScope)
-	certTomlData, err := secureCfg.Latest(acme.CertificateOutputScope)
+	logger.Info("Loading latest certificate data", "scope", acme.CertificateScope)
+	certTomlData, err := secureCfg.Latest(acme.CertificateScope)
 	if err != nil {
-		logger.Error("failed to load certificate data from secure store", "scope", acme.CertificateOutputScope, "error", err)
+		logger.Error("failed to load certificate data from secure store", "scope", acme.CertificateScope, "error", err)
 		os.Exit(1)
 	}
 	if len(certTomlData) == 0 {
-		logger.Error("no certificate data found in secure store", "scope", acme.CertificateOutputScope)
+		logger.Error("no certificate data found in secure store", "scope", acme.CertificateScope)
 		os.Exit(1)
 	}
 
 	var certData acme.Cert
 	if err := toml.Unmarshal(certTomlData, &certData); err != nil {
-		logger.Error("failed to unmarshal certificate TOML data", "scope", acme.CertificateOutputScope, "error", err)
+		logger.Error("failed to unmarshal certificate TOML data", "scope", acme.CertificateScope, "error", err)
 		os.Exit(1)
 	}
-	logger.Info("Successfully loaded and unmarshalled certificate data", "scope", acme.CertificateOutputScope, "identifier", certData.Identifier)
+	logger.Info("Successfully loaded and unmarshalled certificate data", "scope", acme.CertificateScope, "identifier", certData.Identifier)
 
 	// --- Load Latest Application Config ---
 	logger.Info("Loading latest application configuration", "scope", config.ScopeApplication)
