@@ -70,8 +70,6 @@ The `acme` package (`AcmeCertRenewal.go`) contains the primary logic:
 
 This repository includes several command-line utilities built using the `acme` package.
 
----
-
 ### `example`
 
 **Purpose**:  
@@ -88,8 +86,6 @@ Demonstrates how to integrate the `acme.CertRenewalHandler` into a [restinpieces
 ```bash
 go run ./cmd/example -db <path-to-db> -age-key <path-to-identity>
 ```
-
----
 
 ### `generate-blueprint-config`
 
@@ -109,8 +105,6 @@ Outputs a TOML file containing the structure of the `acme.Config` struct with pl
 go run ./cmd/generate-blueprint-config [-o <output-file.toml>]
 ```
 
----
-
 ### `request-acme-cert`
 
 **Purpose**:  
@@ -126,8 +120,6 @@ Manually triggers an ACME certificate request or renewal process *outside* the f
 ```bash
 go run ./cmd/request-acme-cert -db <path> -age-key <path>
 ```
-
----
 
 ### `update-app-certificate`
 
