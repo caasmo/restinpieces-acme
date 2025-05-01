@@ -22,8 +22,8 @@ This Go package provides functionality for automating ACME (Let's Encrypt) certi
 2. **Fill Configuration**: 
    Edit `acme.blueprint.toml` with your:
    - ACME account email
-   - Domains
-   - DNS provider API credentials
+   - Domains (e.g. ["example.com", "*.example.com"] for wildcard)
+   - DNS provider API credentials (required for wildcard certificates)
    - ACME account private key (PEM format). Generate one with:
      ```bash
      openssl genpkey -algorithm Ed25519 -out acme_account_ed25519.key
@@ -80,6 +80,10 @@ This repository includes several command-line utilities built using the `acme` p
 ### `cmd/generate-blueprint-config`
 
 *   **Purpose**: Generates a template TOML configuration file (`acme.blueprint.toml` by default).
+*   **Wildcard Notes**: 
+    * Wildcard certificates require DNS-01 challenge
+    * Must include both base domain and wildcard (e.g. ["example.com", "*.example.com"])
+    * DNS provider credentials must be properly configured
 *   **Functionality**: Outputs a TOML file containing the structure of the `acme.Config` struct with placeholder values. This blueprint can then be filled with actual values and encrypted into the application's secure configuration store using the framework's tools.
 *   **Usage**: `go run ./cmd/generate-blueprint-config [-o <output-file.toml>]`
 

@@ -20,7 +20,7 @@ func generateBlueprintConfig() acme.Config {
 
 	cfg := acme.Config{
 		Email:                 "your-acme-account@example.com",
-		Domains:               []string{"example.com", "www.example.com"}, // Or ["example.com", "*.example.com"] for wildcard
+		Domains:               []string{"example.com", "*.example.com"}, // Wildcard domain must be first in list
 		DNSProviders:          dnsProviders,
 		ActiveDNSProvider:     acme.DNSProviderCloudflare, // Specify which provider in the map to use
 		CADirectoryURL:        "https://acme-staging-v02.api.letsencrypt.org/directory",
