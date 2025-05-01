@@ -7,7 +7,7 @@ This Go package provides functionality for automating ACME (Let's Encrypt) certi
 *   Automated certificate issuance and renewal via ACME protocol.
 *   Supports DNS-01 challenge for wildcard certificates.
 *   Currently supports Cloudflare DNS provider (easily extensible).
-*   Secure storage of ACME account keys, configuration, and obtained certificates using `age` encryption via the `restinpieces/go-application-framework`.
+*   Secure storage of ACME account keys, configuration, and obtained certificates using `age` encryption via the [restinpieces framework](https://github.com/caasmo/restinpieces).
 *   Provides command-line tools for configuration generation, manual renewal, and application certificate updates.
 *   Includes an example demonstrating integration as a job handler within the application framework.
 
