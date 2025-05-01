@@ -55,6 +55,8 @@ type Config struct {
 	ActiveDNSProvider     string // Name of the provider key in DNSProviders map to use
     // openssl genpkey -algorithm Ed25519 -out acme_account_ed25519.key
     // this is account main identifier for acme providers 
+    // For toml manual insertion the Multiline Literal String ('''...''') is
+    // the best choice.
 	AcmeAccountPrivateKey string
 }
 
