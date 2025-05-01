@@ -107,9 +107,6 @@ func main() {
 	logger.Info("Updating application config with certificate data")
 	appCfg.Server.CertData = certData.CertificateChain
 	appCfg.Server.KeyData = certData.PrivateKey
-	// Optionally clear file paths if data is now embedded
-	// appCfg.Server.CertFile = ""
-	// appCfg.Server.KeyFile = ""
 
 	// --- Marshal Updated Application Config ---
 	updatedAppTomlBytes, err := toml.Marshal(appCfg)
