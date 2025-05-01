@@ -43,7 +43,7 @@ This Go package provides functionality for automating ACME (Let's Encrypt) certi
 
 4. **Initial Request (Optional but Recommended)**:
    ```bash
-   go run ./cmd/request-acme-cert -db <db-path> -age-key <id-path>
+   go run ./cmd/request-acme-cert -dbpath <db-path> -age-key <id-path>
    ```
    Ensure necessary environment variables/flags are set.
 
