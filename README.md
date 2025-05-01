@@ -31,11 +31,11 @@ This Go package provides functionality for automating ACME (Let's Encrypt) certi
      Then copy the contents into the `AcmeAccountPrivateKey` field.
 
 3. **Encrypt Configuration**: 
-   Use the `restinpieces` command to encrypt and store the configuration:
+   Use the `insert-config` command to encrypt and store the configuration:
    ```bash
-   go run ../restinpieces/cmd/restinpieces/main.go config encrypt \
+   go run ../restinpieces/cmd/insert-config/main.go \
      --scope acme_config \
-     --input acme.blueprint.toml \
+     --file acme.blueprint.toml \
      --age-key path/to/age.key \
      --db path/to/database.db
    ```
