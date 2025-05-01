@@ -79,7 +79,13 @@ func main() {
 		logger.Error("failed to unmarshal certificate TOML data", "scope", acme.ScopeAcmeCertificate, "error", err)
 		os.Exit(1)
 	}
-	logger.Info("Successfully loaded and unmarshalled certificate data", "scope", acme.ScopeAcmeCertificate, "identifier", certData.Identifier)
+	logger.Info("Successfully loaded and unmarshalled certificate data",
+		"scope", acme.ScopeAcmeCertificate,
+		"identifier", certData.Identifier,
+		"domains", certData.Domains,
+		"issued_at", certData.IssuedAt,
+		"expires_at", certData.ExpiresAt,
+	)
 
 	// --- Load Latest Application Config ---
 	logger.Info("Loading latest application configuration", "scope", config.ScopeApplication)
