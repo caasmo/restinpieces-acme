@@ -1,6 +1,6 @@
 # Go ACME Certificate Renewal Package
 
-This Go package provides functionality for automating ACME (Let's Encrypt) certificate renewals using the DNS-01 challenge. It integrates with the `restinpieces/go-application-framework` for secure configuration storage and job handling.
+This Go package provides functionality for automating ACME (Let's Encrypt) certificate renewals using the DNS-01 challenge. It integrates with the [restinpieces framework](https://github.com/caasmo/restinpieces) for secure configuration storage and job handling.
 
 ## Features
 
@@ -61,7 +61,7 @@ This Go package provides functionality for automating ACME (Let's Encrypt) certi
 
 The `acme` package (`AcmeCertRenewal.go`) contains the primary logic:
 
-*   `CertRenewalHandler`: Implements the `framework.JobHandler` interface. This is the core component responsible for performing the certificate renewal process when triggered as a job.
+*   `CertRenewalHandler`: Implements the job handler interface from [restinpieces](https://github.com/caasmo/restinpieces). This is the core component responsible for performing the certificate renewal process when triggered as a job.
 *   `Config`: Struct defining the necessary configuration (email, domains, DNS provider details, ACME account key).
 *   `Cert`: Struct representing the stored certificate data (certificate chain, private key, expiry).
 *   Support for DNS providers (currently Cloudflare).
@@ -72,7 +72,7 @@ This repository includes several command-line utilities built using the `acme` p
 
 ### `cmd/example`
 
-*   **Purpose**: Demonstrates how to integrate the `acme.CertRenewalHandler` into a `restinpieces/go-application-framework` application.
+*   **Purpose**: Demonstrates how to integrate the `acme.CertRenewalHandler` into a [restinpieces](https://github.com/caasmo/restinpieces) application.
 *   **Functionality**:
     *   Initializes the framework components (database, secure config store).
     *   Loads the ACME configuration (`acme.Config`) from the secure store.
