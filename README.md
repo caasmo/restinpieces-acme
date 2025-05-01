@@ -11,6 +11,15 @@ This Go package provides functionality for automating ACME (Let's Encrypt) certi
 *   Provides command-line tools for configuration generation, manual renewal, and application certificate updates.
 *   Includes an example demonstrating integration as a job handler within the application framework.
 
+## Getting Started
+
+1.  **Generate Blueprint**: Run `go run ./cmd/generate-blueprint-config` to create `acme.blueprint.toml`.
+2.  **Fill Configuration**: Edit `acme.blueprint.toml` with your ACME account email, domains, and DNS provider API credentials. Generate an ACME account private key if you don't have one (PEM format).
+3.  **Encrypt Configuration**: Use the `restinpieces/go-application-framework` tools (e.g., its CLI or API) to encrypt the filled `acme.blueprint.toml` and store it in the secure configuration store under the `acme_config` scope, using your `age` identity.
+4.  **Initial Request (Optional but Recommended)**: Run `go run ./cmd/request-acme-cert -db <db-path> -age-key <id-path>` (ensure necessary env vars/flags are set) to perform the first certificate request and store it.
+5.  **Integrate Handler**: Use `cmd/example` as a reference to register `acme.CertRenewalHandler` in your framework application. Schedule a recurring job of type `certificate_renewal`.
+6.  **Deploy Certificate**: After a renewal job runs successfully, use a mechanism (like `cmd/update-app-certificate` or a custom job) to retrieve the updated certificate from the `acme_certificate` scope and deploy it to your web server or application.
+
 ## Core Package (`acme`)
 
 The `acme` package (`AcmeCertRenewal.go`) contains the primary logic:
