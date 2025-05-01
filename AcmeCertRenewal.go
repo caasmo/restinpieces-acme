@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	ConfigScope           = "acme_config"        // Scope for storing ACME handler config (email, domains, keys)
+	ScopeConfig           = "acme_config"        // Scope for storing ACME handler config (email, domains, keys)
 	ScopeAcmeCertificate  = "acme_certificate"   // Scope for saving obtained cert+key
 	DNSProviderCloudflare = "cloudflare"
 )

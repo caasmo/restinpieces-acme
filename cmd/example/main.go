@@ -63,23 +63,23 @@ func main() {
 	logger := app.Logger() // Get logger from framework
 
 	// --- Load ACME Renewal Config from SecureConfigStore ---
-	logger.Info("Loading ACME configuration from database", "scope", acme.ConfigScope)
-	encryptedTomlData, err := app.SecureConfigStore().Latest(acme.ConfigScope)
+	logger.Info("Loading ACME configuration from database", "scope", acme.ScopeConfig)
+	encryptedTomlData, err := app.SecureConfigStore().Latest(acme.ScopeConfig)
 	if err != nil {
-		logger.Error("failed to load ACME config from DB", "scope", acme.ConfigScope, "error", err)
+		logger.Error("failed to load ACME config from DB", "scope", acme.ScopeConfig, "error", err)
 		os.Exit(1)
 	}
 	if len(encryptedTomlData) == 0 {
-		logger.Error("ACME config data loaded from DB is empty", "scope", acme.ConfigScope)
+		logger.Error("ACME config data loaded from DB is empty", "scope", acme.ScopeConfig)
 		os.Exit(1)
 	}
 
 	var renewalCfg acme.Config // Declare variable to hold the config
 	if err := toml.Unmarshal(encryptedTomlData, &renewalCfg); err != nil {
-		logger.Error("failed to unmarshal ACME TOML config", "scope", acme.ConfigScope, "error", err)
+		logger.Error("failed to unmarshal ACME TOML config", "scope", acme.ScopeConfig, "error", err)
 		os.Exit(1)
 	}
-	logger.Info("Successfully unmarshalled ACME config", "scope", acme.ConfigScope)
+	logger.Info("Successfully unmarshalled ACME config", "scope", acme.ScopeConfig)
 
 	certHandler := acme.NewCertRenewalHandler(&renewalCfg, app.SecureConfigStore(), logger)
 
