@@ -53,6 +53,8 @@ type Config struct {
 	// register your account key on each environment you interact with
 	CADirectoryURL        string
 	ActiveDNSProvider     string // Name of the provider key in DNSProviders map to use
+    // openssl genpkey -algorithm Ed25519 -out acme_account_ed25519.key
+    // this is account main identifier for acme providers 
 	AcmeAccountPrivateKey string
 }
 
