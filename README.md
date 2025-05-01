@@ -24,7 +24,11 @@ This Go package provides functionality for automating ACME (Let's Encrypt) certi
    - ACME account email
    - Domains
    - DNS provider API credentials
-   - ACME account private key (PEM format)
+   - ACME account private key (PEM format). Generate one with:
+     ```bash
+     openssl genpkey -algorithm Ed25519 -out acme_account_ed25519.key
+     ```
+     Then copy the contents into the `AcmeAccountPrivateKey` field.
 
 3. **Encrypt Configuration**: 
    Use the `restinpieces/go-application-framework` tools to encrypt and store the configuration:
