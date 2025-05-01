@@ -66,46 +66,80 @@ The `acme` package (`AcmeCertRenewal.go`) contains the primary logic:
 *   `Cert`: Struct representing the stored certificate data (certificate chain, private key, expiry).
 *   Support for DNS providers (currently Cloudflare).
 
-## Commands (`cmd/`)
+## Commands
 
 This repository includes several command-line utilities built using the `acme` package.
 
-### `cmd/example`
+---
 
-*   **Purpose**: Demonstrates how to integrate the `acme.CertRenewalHandler` into a [restinpieces](https://github.com/caasmo/restinpieces) application.
-*   **Functionality**:
-    *   Initializes the framework components (database, secure config store).
-    *   Loads the ACME configuration (`acme.Config`) from the secure store.
-    *   Creates an instance of `acme.NewCertRenewalHandler`.
-    *   Registers the handler with the framework's job runner for the `certificate_renewal` job type.
-    *   Starts the framework server/runner.
-*   **Usage**: This command serves as a blueprint for integrating ACME renewal into your own application based on the framework. Run it with `-db <path-to-db>` and `-age-key <path-to-identity>`.
+### `example`
 
-### `cmd/generate-blueprint-config`
+**Purpose**:  
+Demonstrates how to integrate the `acme.CertRenewalHandler` into a [restinpieces](https://github.com/caasmo/restinpieces) application.
 
-*   **Purpose**: Generates a template TOML configuration file (`acme.blueprint.toml` by default).
-*   **Wildcard Notes**: 
-    * Wildcard certificates require DNS-01 challenge
-    * Must include both base domain and wildcard (e.g. ["example.com", "*.example.com"])
-    * DNS provider credentials must be properly configured
-*   **Functionality**: Outputs a TOML file containing the structure of the `acme.Config` struct with placeholder values. This blueprint can then be filled with actual values and encrypted into the application's secure configuration store using the framework's tools.
-*   **Usage**: `go run ./cmd/generate-blueprint-config [-o <output-file.toml>]`
+**Functionality**:  
+- Initializes the framework components (database, secure config store)
+- Loads the ACME configuration (`acme.Config`) from the secure store
+- Creates an instance of `acme.NewCertRenewalHandler`
+- Registers the handler with the framework's job runner for the `certificate_renewal` job type
+- Starts the framework server/runner
 
-### `cmd/request-acme-cert`
+**Usage**:  
+```bash
+go run ./cmd/example -db <path-to-db> -age-key <path-to-identity>
+```
 
-*   **Purpose**: Manually triggers an ACME certificate request or renewal process *outside* the framework's job runner.
-*   **Functionality**:
-    *   Loads necessary configuration (ACME config, potentially DNS provider credentials) - *Note: How it loads config needs clarification, likely expects environment variables or flags*.
-    *   Initializes the ACME client (`lego`).
-    *   Performs the certificate order and challenge process.
-    *   Saves the obtained certificate (chain and private key) to the secure configuration store under the `acme_certificate` scope.
-*   **Usage**: Useful for initial certificate acquisition or manual renewals/tests. Requires configuration details (e.g., via environment variables or flags - check its source/flags for specifics) and access to the secure config store (`-db <path>`, `-age-key <path>`).
+---
 
-### `cmd/update-app-certificate`
+### `generate-blueprint-config`
 
-*   **Purpose**: Retrieves the latest certificate stored by the ACME handler and updates a target application's configuration or files.
-*   **Functionality**:
-    *   Connects to the secure configuration store.
-    *   Reads the `acme.Cert` data stored under the `acme_certificate` scope.
-    *   *How* it updates the application is specific to this command's implementation (e.g., updating specific config files, reloading a service). It likely reads another configuration scope (`app_config`?) to know *what* to update.
-*   **Usage**: Intended to be run after a successful certificate renewal to deploy the new certificate to the application that needs it. Requires access to the secure config store (`-dbpath <path>`, `-age-key <path>`).
+**Purpose**:  
+Generates a template TOML configuration file (`acme.blueprint.toml` by default).
+
+**Wildcard Notes**:  
+- Wildcard certificates require DNS-01 challenge
+- Must include both base domain and wildcard (e.g. ["example.com", "*.example.com"])
+- DNS provider credentials must be properly configured
+
+**Functionality**:  
+Outputs a TOML file containing the structure of the `acme.Config` struct with placeholder values.
+
+**Usage**:  
+```bash
+go run ./cmd/generate-blueprint-config [-o <output-file.toml>]
+```
+
+---
+
+### `request-acme-cert`
+
+**Purpose**:  
+Manually triggers an ACME certificate request or renewal process *outside* the framework's job runner.
+
+**Functionality**:  
+- Loads necessary configuration (ACME config, potentially DNS provider credentials)
+- Initializes the ACME client (`lego`)
+- Performs the certificate order and challenge process
+- Saves the obtained certificate to the secure configuration store
+
+**Usage**:  
+```bash
+go run ./cmd/request-acme-cert -db <path> -age-key <path>
+```
+
+---
+
+### `update-app-certificate`
+
+**Purpose**:  
+Retrieves the latest certificate and updates a target application's configuration or files.
+
+**Functionality**:  
+- Connects to the secure configuration store
+- Reads the `acme.Cert` data
+- Updates application configuration/files as needed
+
+**Usage**:  
+```bash
+go run ./cmd/update-app-certificate -dbpath <path> -age-key <path>
+```
