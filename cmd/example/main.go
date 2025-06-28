@@ -76,6 +76,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Check if the format is TOML before unmarshalling
+	if format != "toml" {
+		logger.Error("ACME config data is not in TOML format", "scope", acme.ScopeConfig, "expected_format", "toml", "actual_format", format)
+		os.Exit(1)
+	}
+
 	var renewalCfg acme.Config // Declare variable to hold the config
 	if err := toml.Unmarshal(encryptedTomlData, &renewalCfg); err != nil {
 		logger.Error("failed to unmarshal ACME TOML config", "scope", acme.ScopeConfig, "error", err)
