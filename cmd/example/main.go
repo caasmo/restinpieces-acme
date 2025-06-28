@@ -50,9 +50,9 @@ func main() {
 
 	// --- Initialize restinpieces ---
 	app, srv, err := restinpieces.New(
-		restinpieces.WithDbZombiezen(dbPool),     // Provide the pool
-		restinpieces.WithAgeKeyPath(*ageKeyPath), // Provide age key path
-		restinpieces.WithTextLogger(nil), // Use default text logger
+		restinpieces.WithZombiezenPool(dbPool),     
+		restinpieces.WithAgeKeyPath(*ageKeyPath), 
+		restinpieces.WithLogger(nil), 
 	)
 	if err != nil {
 		slog.Error("failed to initialize restinpieces application", "error", err)
@@ -62,7 +62,7 @@ func main() {
 
 	// --- Load ACME Renewal Config from SecureConfigStore ---
 	logger.Info("Loading ACME configuration from database", "scope", acme.ScopeConfig)
-	encryptedTomlData, err := app.SecureConfigStore().Latest(acme.ScopeConfig)
+	encryptedTomlData, format, err := app.ConfigStore().Get(acme.ScopeConfig, 0)
 	if err != nil {
 		logger.Error("failed to load ACME config from DB", "scope", acme.ScopeConfig, "error", err)
 		os.Exit(1)
@@ -79,7 +79,7 @@ func main() {
 	}
 	logger.Info("Successfully unmarshalled ACME config", "scope", acme.ScopeConfig)
 
-	certHandler := acme.NewCertRenewalHandler(&renewalCfg, app.SecureConfigStore(), logger)
+	certHandler := acme.NewCertRenewalHandler(&renewalCfg, app.ConfigStore(), logger)
 
 	err = srv.AddJobHandler(JobTypeCertRenewal, certHandler)
 	if err != nil {
