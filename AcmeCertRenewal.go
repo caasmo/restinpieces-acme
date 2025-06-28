@@ -73,11 +73,11 @@ type Cert struct {
 
 type CertRenewalHandler struct {
 	config            *Config
-	secureConfigStore config.SecureConfig
+	secureConfigStore config.SecureStore
 	logger            *slog.Logger
 }
 
-func NewCertRenewalHandler(cfg *Config, store config.SecureConfig, logger *slog.Logger) *CertRenewalHandler {
+func NewCertRenewalHandler(cfg *Config, store config.SecureStore, logger *slog.Logger) *CertRenewalHandler {
 	if cfg == nil || store == nil || logger == nil {
 		panic("NewCertRenewalHandler: received nil config, store, or logger")
 	}

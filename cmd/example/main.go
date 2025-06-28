@@ -52,8 +52,6 @@ func main() {
 	app, srv, err := restinpieces.New(
 		restinpieces.WithDbZombiezen(dbPool),     // Provide the pool
 		restinpieces.WithAgeKeyPath(*ageKeyPath), // Provide age key path
-		restinpieces.WithRouterServeMux(),
-		restinpieces.WithCacheRistretto(),
 		restinpieces.WithTextLogger(nil), // Use default text logger
 	)
 	if err != nil {
