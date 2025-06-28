@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log/slog"
+	"log/slog" // Import slog
 	"os"
 
 	"github.com/caasmo/restinpieces"
@@ -17,6 +17,9 @@ const JobTypeCertRenewal = "certificate_renewal"
 // Pool creation helpers moved to restinpieces package
 
 func main() {
+	// Create a simple slog text logger that outputs to stdout
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
 	dbPath := flag.String("db", "", "Path to the SQLite DB (used by framework AND acme history)")
 	ageKeyPath := flag.String("age-key", "", "Path to the age identity (private key) file (required)")
 
@@ -37,28 +40,29 @@ func main() {
 	// --- Create Database Pool (Shared by framework and ACME history) ---
 	dbPool, err := restinpieces.NewZombiezenPool(*dbPath) // Use dbPath
 	if err != nil {
-		slog.Error("failed to create database pool", "path", *dbPath, "error", err)
+		logger.Error("failed to create database pool", "path", *dbPath, "error", err) // Use the new logger
 		os.Exit(1) // Exit if pool creation fails
 	}
 
 	defer func() {
-		slog.Info("Closing database pool...")
+		logger.Info("Closing database pool...") // Use the new logger
 		if err := dbPool.Close(); err != nil {
-			slog.Error("Error closing database pool", "error", err)
+			logger.Error("Error closing database pool", "error", err) // Use the new logger
 		}
 	}()
 
 	// --- Initialize restinpieces ---
 	app, srv, err := restinpieces.New(
-		restinpieces.WithZombiezenPool(dbPool),     
-		restinpieces.WithAgeKeyPath(*ageKeyPath), 
-		restinpieces.WithLogger(nil), 
+		restinpieces.WithZombiezenPool(dbPool),
+		restinpieces.WithAgeKeyPath(*ageKeyPath),
+		restinpieces.WithLogger(logger), // Inject the created logger
 	)
 	if err != nil {
-		slog.Error("failed to initialize restinpieces application", "error", err)
+		logger.Error("failed to initialize restinpieces application", "error", err) // Use the new logger
 		os.Exit(1) // Pool closed by defer
 	}
-	logger := app.Logger() // Get logger from framework
+	// Re-assign logger to the one provided by the app, as it might have additional context or handlers.
+	logger = app.Logger()
 
 	// --- Load ACME Renewal Config from SecureConfigStore ---
 	logger.Info("Loading ACME configuration from database", "scope", acme.ScopeConfig)
@@ -90,5 +94,5 @@ func main() {
 
 	srv.Run()
 
-	slog.Info("Server shut down gracefully.")
+	logger.Info("Server shut down gracefully.")
 }
