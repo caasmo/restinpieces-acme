@@ -13,44 +13,58 @@ This Go package provides functionality for automating ACME (Let's Encrypt) certi
 
 ## Getting Started
 
-1. **Generate Blueprint**:
-   ```bash
-   go run ./cmd/generate-blueprint-config
-   ```
-   This creates `acme.blueprint.toml`.
+### Generate Blueprint
 
-2. **Fill Configuration**: 
-   Edit `acme.blueprint.toml` with your:
-   - ACME account email
-   - Domains (e.g. ["example.com", "*.example.com"] for wildcard)
-   - DNS provider API credentials (required for wildcard certificates)
-   - ACME account private key (PEM format). Generate one with:
-     ```bash
-     openssl genpkey -algorithm Ed25519 -out acme_account_ed25519.key
-     ```
-     Then copy the contents into the `AcmeAccountPrivateKey` field.
+```bash
+go run ./cmd/generate-blueprint-config
+```
 
-3. **Encrypt Configuration**: 
-   Use the `ripc save` command to encrypt and store the configuration:
-   ```bash
-   go run ../restinpieces/cmd/ripc -dbpath path/to/database.db -agekey path/to/age.key save --scope acme_config acme.blueprint.toml
-   ```
-   See all available commands in the [restinpieces CLI documentation](https://github.com/caasmo/restinpieces/tree/main/cmd).
+This creates `acme.blueprint.toml`.
 
-4. **Initial Request (Optional but Recommended)**:
-   ```bash
-   go run ./cmd/request-acme-cert -dbpath <db-path> -agekey <id-path>
-   ```
-   Ensure necessary environment variables/flags are set.
+### Fill Configuration
 
-5. **Integrate Handler**: 
-   Use `cmd/example` as a reference to register `acme.CertHandler` in your framework application and schedule recurring jobs.
+Edit `acme.blueprint.toml` with your:
 
-6. **Deploy Certificate**:
-   ```bash
-   go run ./cmd/update-app-certificate -dbpath <db-path> -agekey <id-path>
-   ```
-   Run this after successful renewals to deploy the new certificate.
+- ACME account email (must be at a domain you control; Let's Encrypt rejects reserved domains such as `example.com` with `invalidContact`)
+- Domains (e.g. ["example.com", "*.example.com"] for wildcard)
+- DNS provider API credentials (required for wildcard certificates)
+- ACME account private key (PEM format). Generate an ECDSA P-256 key with:
+
+  ```bash
+  openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out acme_account_ec256.key
+  ```
+
+  Then copy the contents into the `AcmeAccountPrivateKey` field.
+
+### Encrypt Configuration
+
+Use the `ripc save` command to encrypt and store the configuration:
+
+```bash
+go run ../restinpieces/cmd/ripc -dbpath path/to/database.db -agekey path/to/age.key save --scope acme_config acme.blueprint.toml
+```
+
+See all available commands in the [restinpieces CLI documentation](https://github.com/caasmo/restinpieces/tree/main/cmd).
+
+### Initial Request (Optional but Recommended)
+
+```bash
+go run ./cmd/request-acme-cert -dbpath <db-path> -agekey <id-path>
+```
+
+Ensure necessary environment variables/flags are set.
+
+### Integrate Handler
+
+Use `cmd/example` as a reference to register `acme.CertHandler` in your framework application and schedule recurring jobs.
+
+### Deploy Certificate
+
+```bash
+go run ./cmd/update-app-certificate -dbpath <db-path> -agekey <id-path>
+```
+
+Run this after successful renewals to deploy the new certificate.
 
 
 ## Core Package (`acme`)
@@ -61,6 +75,8 @@ The `acme` package (`acme_cert.go`) contains the primary logic:
 *   `Config`: Struct defining the necessary configuration (email, domains, DNS provider details, ACME account key).
 *   `Cert`: Struct representing the stored certificate data (certificate chain, private key, expiry).
 *   Support for DNS providers (currently Cloudflare).
+
+During a renewal, lego calls the Cloudflare API first to publish the `_acme-challenge` TXT record, then polls DNS until the record is visible, and only if that polling succeeds does it call Let's Encrypt to trigger validation.
 
 ## Commands
 

@@ -38,6 +38,7 @@ import (
 	"github.com/go-acme/lego/v5/challenge"
 	"github.com/go-acme/lego/v5/challenge/dns01"
 	"github.com/go-acme/lego/v5/lego"
+	legolog "github.com/go-acme/lego/v5/log"
 	"github.com/go-acme/lego/v5/providers/dns/cloudflare"
 	"github.com/go-acme/lego/v5/registration"
 )
@@ -102,9 +103,11 @@ type Config struct {
 
 	// AcmeAccountPrivateKey is the ACME account's private key in PEM form. It
 	// identifies the account, so keep it secret and reuse it to reach the same
-	// account on later runs. Generate one with:
+	// account on later runs. lego signs its requests with this key and accepts
+	// ECDSA (P-256 or P-384) and RSA keys; Ed25519 keys are not supported.
+	// Generate an ECDSA P-256 key with:
 	//
-	//	openssl genpkey -algorithm Ed25519 -out acme_account_ed25519.key
+	//	openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out acme_account_ec256.key
 	//
 	// In TOML, paste it as a multi-line literal string ('''...''').
 	AcmeAccountPrivateKey string
@@ -143,15 +146,20 @@ type CertHandler struct {
 }
 
 // NewCertHandler builds a handler from the certificate settings, the encrypted
-// store used to save the certificate, and a logger.
+// store used to save the certificate, and a logger. It also points lego's own
+// logger at the handler's logger, so lego's step logs (DNS-01 progress, order
+// validation) share the same format and level as the handler's lines.
 func NewCertHandler(cfg *Config, store config.SecureStore, logger *slog.Logger) *CertHandler {
 	if cfg == nil || store == nil || logger == nil {
 		panic("NewCertHandler: received nil config, store, or logger")
 	}
+	handlerLogger := logger.With("job_handler", "acme_cert")
+	legolog.SetDefault(handlerLogger)
+
 	return &CertHandler{
 		config:            cfg,
 		secureConfigStore: store,
-		logger:            logger.With("job_handler", "acme_cert"),
+		logger:            handlerLogger,
 	}
 }
 
@@ -234,7 +242,14 @@ func (h *CertHandler) Handle(ctx context.Context, job db.Job) error {
 	// not to the solver.
 	dns01.SetDefaultClient(dns01.NewClient(&dns01.Options{Timeout: dnsQueryTimeout}))
 
-	err = legoClient.Challenge.SetDNS01Provider(dnsProvider)
+	// Require the challenge record only on the domain's authoritative servers.
+	// lego's default also requires it on the local recursive resolvers, but they
+	// cache the NXDOMAIN from lego's zone lookup, which runs before the record
+	// exists, for the zone's negative TTL (30 minutes on Cloudflare). The cached
+	// answer outlives the propagation window, so that check can never pass.
+	// Let's Encrypt validates against the authoritative servers, so that is the
+	// check that matters.
+	err = legoClient.Challenge.SetDNS01Provider(dnsProvider, dns01.DisableRecursiveNSsPropagationRequirement())
 	if err != nil {
 		h.logger.Error("Failed to set DNS01 provider", "provider", providerName, "error", err)
 		return fmt.Errorf("failed to set DNS01 provider: %w", err)
