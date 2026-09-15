@@ -31,7 +31,7 @@ import (
 
 	"github.com/caasmo/restinpieces/config"
 	"github.com/caasmo/restinpieces/db"
-	"github.com/pelletier/go-toml/v2"
+	"github.com/pelletier/go-toml"
 
 	legoacme "github.com/go-acme/lego/v5/acme"
 	"github.com/go-acme/lego/v5/certcrypto"
@@ -98,21 +98,20 @@ func (u *AcmeUser) GetRegistration() *legoacme.ExtendedAccount { return u.Regist
 func (u *AcmeUser) GetPrivateKey() crypto.Signer { return u.PrivateKey }
 
 // Handle obtains a certificate and stages it in the Acme section of the
-// application configuration. It reads the configuration from the encrypted
+// application configuration. It reads the Acme section from the encrypted
 // store at the start, so it always sees the latest saved values. The job
 // queue calls it for each acme_cert job; the job value itself is not used.
 //
-// The steps follow the ACME order of operations: load the application config,
-// parse the account key and build a client for the configured ACME server,
-// select the dns-01 entry and register its solver, register the account
-// (idempotent, so an existing account is looked up rather than created),
-// obtain the certificate, and stage it.
+// The steps follow the ACME order of operations: load the Acme section, parse
+// the account key and build a client for the configured ACME server, select
+// the dns-01 entry and register its solver, register the account (idempotent,
+// so an existing account is looked up rather than created), obtain the
+// certificate, and stage it.
 func (h *CertHandler) Handle(ctx context.Context, job db.Job) error {
-	cfg, err := h.loadApplicationConfig()
+	acmeCfg, err := h.loadAcmeConfig()
 	if err != nil {
 		return err
 	}
-	acmeCfg := cfg.Acme
 
 	h.logger.Info("Attempting certificate request", "domains", acmeCfg.Domains)
 
@@ -196,7 +195,7 @@ func (h *CertHandler) Handle(ctx context.Context, job db.Job) error {
 	}
 	h.logger.Info("Successfully obtained certificate", "domains", request.Domains, "certificate_url", resource.CertURL)
 
-	err = h.saveCertificate(cfg, resource)
+	err = h.saveCertificate(resource)
 	if err != nil {
 		return err
 	}
@@ -205,34 +204,36 @@ func (h *CertHandler) Handle(ctx context.Context, job db.Job) error {
 	return nil
 }
 
-// loadApplicationConfig reads the application configuration from the encrypted
-// store and merges it over the framework defaults, so the handler works with
-// the same configuration the application runs with.
-func (h *CertHandler) loadApplicationConfig() (*config.Config, error) {
+// loadAcmeConfig reads the Acme section of the application configuration from
+// the encrypted store. The rest of the document belongs to the framework, so
+// only the Acme section is parsed.
+func (h *CertHandler) loadAcmeConfig() (config.Acme, error) {
 	tomlData, format, err := h.secureConfigStore.Get(config.ScopeApplication, 0)
 	if err != nil {
 		h.logger.Error("Failed to load application config from secure store", "scope", config.ScopeApplication, "error", err)
-		return nil, fmt.Errorf("failed to load application config: %w", err)
+		return config.Acme{}, fmt.Errorf("failed to load application config: %w", err)
 	}
 	if len(tomlData) == 0 {
 		err := fmt.Errorf("application config loaded from secure store is empty")
 		h.logger.Error(err.Error(), "scope", config.ScopeApplication)
-		return nil, err
+		return config.Acme{}, err
 	}
 	if format != "toml" {
 		err := fmt.Errorf("application config is not in TOML format, got %q", format)
 		h.logger.Error(err.Error(), "scope", config.ScopeApplication)
-		return nil, err
+		return config.Acme{}, err
 	}
 
-	cfg := config.NewDefaultConfig()
-	err = toml.Unmarshal(tomlData, cfg)
+	var document struct {
+		Acme config.Acme `toml:"acme"`
+	}
+	err = toml.Unmarshal(tomlData, &document)
 	if err != nil {
-		h.logger.Error("Failed to unmarshal application config", "scope", config.ScopeApplication, "error", err)
-		return nil, fmt.Errorf("failed to unmarshal application config: %w", err)
+		h.logger.Error("Failed to unmarshal Acme section from application config", "scope", config.ScopeApplication, "error", err)
+		return config.Acme{}, fmt.Errorf("failed to unmarshal Acme section: %w", err)
 	}
 
-	return cfg, nil
+	return document.Acme, nil
 }
 
 // dns01Entry returns the single dns-01 entry that has a provider set. An empty
@@ -293,8 +294,10 @@ func getDNSProvider(entryLabel string, entry config.AcmeDNS01Entry, logger *slog
 
 // saveCertificate stages the obtained certificate chain and its private key in
 // the Acme section of the application configuration, so the deploy step can
-// move them into the server's TLS settings.
-func (h *CertHandler) saveCertificate(cfg *config.Config, resource *certificate.Resource) error {
+// move them into the server's TLS settings. Like 'ripc set', it reads the
+// stored document and sets only the two acme keys, so every other key and
+// comment in the configuration is left as it is.
+func (h *CertHandler) saveCertificate(resource *certificate.Resource) error {
 	// The chain starts with the certificate itself. Decode it to read when it
 	// expires for the stored version's description.
 	block, _ := pem.Decode(resource.Certificate)
@@ -310,10 +313,24 @@ func (h *CertHandler) saveCertificate(cfg *config.Config, resource *certificate.
 		return err
 	}
 
-	cfg.Acme.Certificate = string(resource.Certificate)
-	cfg.Acme.PrivateKey = string(resource.PrivateKey)
+	// Read the document fresh so edits made while the request was running are
+	// not overwritten.
+	tomlData, format, err := h.secureConfigStore.Get(config.ScopeApplication, 0)
+	if err != nil {
+		h.logger.Error("Failed to load application config from secure store", "scope", config.ScopeApplication, "error", err)
+		return fmt.Errorf("failed to load application config: %w", err)
+	}
 
-	tomlBytes, err := toml.Marshal(cfg)
+	tree, err := toml.LoadBytes(tomlData)
+	if err != nil {
+		h.logger.Error("Failed to parse application config TOML", "scope", config.ScopeApplication, "error", err)
+		return fmt.Errorf("failed to parse application config TOML: %w", err)
+	}
+
+	tree.Set("acme.certificate", string(resource.Certificate))
+	tree.Set("acme.private_key", string(resource.PrivateKey))
+
+	tomlBytes, err := toml.Marshal(tree)
 	if err != nil {
 		h.logger.Error("Failed to marshal application config to TOML", "error", err)
 		return fmt.Errorf("failed to marshal application config to TOML: %w", err)
@@ -323,7 +340,7 @@ func (h *CertHandler) saveCertificate(cfg *config.Config, resource *certificate.
 	description := fmt.Sprintf("Staged certificate for domains: %s (expires %s)", strings.Join(resource.Domains, ", "), expiryStr)
 
 	h.logger.Info("Staging obtained certificate", "scope", config.ScopeApplication, "format", "toml", "identifier", resource.ID)
-	err = h.secureConfigStore.Save(config.ScopeApplication, tomlBytes, "toml", description)
+	err = h.secureConfigStore.Save(config.ScopeApplication, tomlBytes, format, description)
 	if err != nil {
 		h.logger.Error("Failed to save application config via SecureConfigStore", "scope", config.ScopeApplication, "error", err)
 		return err

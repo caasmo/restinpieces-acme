@@ -9,7 +9,7 @@ import (
 	"github.com/caasmo/restinpieces"
 	"github.com/caasmo/restinpieces/config"
 	"github.com/caasmo/restinpieces/db/databasesql"
-	"github.com/pelletier/go-toml/v2"
+	"github.com/pelletier/go-toml"
 )
 
 func main() {
@@ -78,35 +78,47 @@ func main() {
 		os.Exit(1)
 	}
 
-	appCfg := config.NewDefaultConfig()
-	err = toml.Unmarshal(appTomlData, appCfg)
+	tree, err := toml.LoadBytes(appTomlData)
 	if err != nil {
-		logger.Error("failed to unmarshal application config TOML data", "scope", config.ScopeApplication, "error", err)
+		logger.Error("failed to parse application config TOML data", "scope", config.ScopeApplication, "error", err)
 		os.Exit(1)
 	}
-	logger.Info("Successfully loaded and unmarshalled application configuration", "scope", config.ScopeApplication)
+
+	acmeTree, ok := tree.Get("acme").(*toml.Tree)
+	if !ok {
+		logger.Error("no acme section found in application config", "scope", config.ScopeApplication)
+		os.Exit(1)
+	}
+
+	var acmeCfg config.Acme
+	err = acmeTree.Unmarshal(&acmeCfg)
+	if err != nil {
+		logger.Error("failed to read the acme section from application config", "scope", config.ScopeApplication, "error", err)
+		os.Exit(1)
+	}
+	logger.Info("Successfully loaded application configuration", "scope", config.ScopeApplication)
 
 	// --- Move the Staged Certificate into the Server TLS Settings ---
-	if appCfg.Acme.Certificate == "" || appCfg.Acme.PrivateKey == "" {
+	if acmeCfg.Certificate == "" || acmeCfg.PrivateKey == "" {
 		logger.Error("no staged certificate found in the acme section", "scope", config.ScopeApplication)
 		os.Exit(1)
 	}
 
-	logger.Info("Moving the staged certificate into the server TLS settings", "domains", appCfg.Acme.Domains)
-	appCfg.Server.Tls.Certificate = appCfg.Acme.Certificate
-	appCfg.Server.Tls.PrivateKey = appCfg.Acme.PrivateKey
+	logger.Info("Moving the staged certificate into the server TLS settings", "domains", acmeCfg.Domains)
+	tree.Set("server.tls.certificate", acmeCfg.Certificate)
+	tree.Set("server.tls.private_key", acmeCfg.PrivateKey)
 
 	// --- Marshal and Save the Updated Application Config ---
-	updatedAppTomlBytes, err := toml.Marshal(appCfg)
+	updatedAppTomlBytes, err := toml.Marshal(tree)
 	if err != nil {
 		logger.Error("failed to marshal updated application config to TOML", "error", err)
 		os.Exit(1)
 	}
 
 	// --- Save Updated Application Config ---
-	description := fmt.Sprintf("Deployed staged certificate for domains: %v", appCfg.Acme.Domains)
+	description := fmt.Sprintf("Deployed staged certificate for domains: %v", acmeCfg.Domains)
 	logger.Info("Saving updated application configuration", "scope", config.ScopeApplication)
-	err = secureCfg.Save(config.ScopeApplication, updatedAppTomlBytes, "toml", description)
+	err = secureCfg.Save(config.ScopeApplication, updatedAppTomlBytes, appFormat, description)
 	if err != nil {
 		logger.Error("failed to save updated application config via SecureConfig", "scope", config.ScopeApplication, "error", err)
 		os.Exit(1)

@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/caasmo/restinpieces v0.28.0
 	github.com/go-acme/lego/v5 v5.4.1
-	github.com/pelletier/go-toml/v2 v2.4.3
+	github.com/pelletier/go-toml v1.9.5
 )
 
 replace github.com/caasmo/restinpieces => ../restinpieces
@@ -26,6 +26,7 @@ require (
 	github.com/miekg/dns v1.1.73 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
+	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
 	github.com/prometheus/client_golang v1.22.0 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
