@@ -13,7 +13,6 @@ import (
 	"github.com/caasmo/restinpieces/config"
 	"github.com/caasmo/restinpieces/db"
 	"github.com/caasmo/restinpieces/db/databasesql"
-	"github.com/pelletier/go-toml/v2"
 )
 
 func main() {
@@ -24,7 +23,7 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 	slog.SetDefault(logger) // Set globally for libraries that might use slog's default
 
-	logger.Info("Starting ACME certificate renewal runner...")
+	logger.Info("Starting ACME certificate request runner...")
 
 	// --- Flags ---
 	dbPath := flag.String("dbpath", "app.db", "path to SQLite database file")
@@ -32,7 +31,7 @@ func main() {
 
 	flag.Usage = func() {
 		_, _ = fmt.Fprintf(os.Stderr, "Usage: %s -dbpath <db-path> -agekey <id-path>\n\n", os.Args[0])
-		_, _ = fmt.Fprintf(os.Stderr, "Runs the ACME certificate renewal process using config from the database.\n\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Obtains a certificate using the acme section of the application configuration.\n\n")
 		_, _ = fmt.Fprintf(os.Stderr, "Flags:\n")
 		flag.PrintDefaults()
 	}
@@ -72,32 +71,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// --- Load ACME Config from Secure Store ---
-	logger.Info("Loading ACME configuration from database", "scope", acme.ScopeConfig)
-	configTomlData, format, err := secureCfgStore.Get(acme.ScopeConfig, 0)
-	if err != nil {
-		logger.Error("failed to load ACME config from DB", "scope", acme.ScopeConfig, "error", err)
-		os.Exit(1)
-	}
-	if len(configTomlData) == 0 {
-		logger.Error("ACME config data loaded from DB is empty", "scope", acme.ScopeConfig)
-		os.Exit(1)
-	}
-	if format != "toml" {
-		logger.Error("ACME config data is not in TOML format", "scope", acme.ScopeConfig, "expected_format", "toml", "actual_format", format)
-		os.Exit(1)
-	}
-
-	var renewalCfg acme.Config
-	err = toml.Unmarshal(configTomlData, &renewalCfg)
-	if err != nil {
-		logger.Error("failed to unmarshal ACME TOML config", "scope", acme.ScopeConfig, "error", err)
-		os.Exit(1)
-	}
-	logger.Info("Successfully unmarshalled ACME config", "scope", acme.ScopeConfig)
-
 	// --- Handler Instantiation ---
-	certHandler := acme.NewCertHandler(&renewalCfg, secureCfgStore, logger)
+	certHandler := acme.NewCertHandler(secureCfgStore, logger)
 
 	// --- Job Execution ---
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
@@ -116,6 +91,6 @@ func main() {
 	}
 
 	logger.Info("Handler execution completed successfully.")
-	logger.Info("Certificate should now be saved in the database via SecureConfigStore.", "db_path", *dbPath, "scope", acme.ScopeAcmeCertificate)
-	logger.Info("You can check the database content using sqlite commands or a config dump command.")
+	logger.Info("Certificate staged in the application config.", "db_path", *dbPath, "scope", config.ScopeApplication)
+	logger.Info("Run the deploy command to move it into the server TLS settings.")
 }

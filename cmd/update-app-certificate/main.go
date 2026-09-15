@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/caasmo/restinpieces"
-	"github.com/caasmo/restinpieces-acme"
 	"github.com/caasmo/restinpieces/config"
 	"github.com/caasmo/restinpieces/db/databasesql"
 	"github.com/pelletier/go-toml/v2"
@@ -23,7 +22,7 @@ func main() {
 
 	flag.Usage = func() {
 		_, _ = fmt.Fprintf(os.Stderr, "Usage: %s -dbpath <db-file> -agekey <identity-file>\n", os.Args[0])
-		_, _ = fmt.Fprintf(os.Stderr, "Updates the main application configuration with the latest certificate data from the secure store.\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Moves the staged certificate from the acme section into the server TLS settings.\n")
 		_, _ = fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 	}
@@ -63,45 +62,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	// --- Load Latest Certificate Data ---
-	logger.Info("Loading latest certificate data", "scope", acme.ScopeAcmeCertificate)
-	certTomlData, certFormat, err := secureCfg.Get(acme.ScopeAcmeCertificate, 0)
-	if err != nil {
-		logger.Error("failed to load certificate data from secure store", "scope", acme.ScopeAcmeCertificate, "error", err)
-		os.Exit(1)
-	}
-	if len(certTomlData) == 0 {
-		logger.Error("no certificate data found in secure store", "scope", acme.ScopeAcmeCertificate)
-		os.Exit(1)
-	}
-	if certFormat != "toml" {
-		logger.Error("certificate data is not in TOML format", "scope", acme.ScopeAcmeCertificate, "expected_format", "toml", "actual_format", certFormat)
-		os.Exit(1)
-	}
-
-	var certData acme.Cert
-	err = toml.Unmarshal(certTomlData, &certData)
-	if err != nil {
-		logger.Error("failed to unmarshal certificate TOML data", "scope", acme.ScopeAcmeCertificate, "error", err)
-		os.Exit(1)
-	}
-	logger.Info("Successfully loaded and unmarshalled certificate data",
-		"scope", acme.ScopeAcmeCertificate,
-		"identifier", certData.Identifier,
-		"domains", certData.Domains,
-		"issued_at", certData.IssuedAt,
-		"expires_at", certData.ExpiresAt,
-	)
-
-	// --- Load Latest Application Config ---
-	logger.Info("Loading latest application configuration", "scope", config.ScopeApplication)
+	// --- Load the Application Config ---
+	logger.Info("Loading application configuration", "scope", config.ScopeApplication)
 	appTomlData, appFormat, err := secureCfg.Get(config.ScopeApplication, 0)
 	if err != nil {
 		logger.Error("failed to load application config from secure store", "scope", config.ScopeApplication, "error", err)
 		os.Exit(1)
 	}
 	if len(appTomlData) == 0 {
-		logger.Warn("no existing application configuration found in secure store", "scope", config.ScopeApplication)
+		logger.Error("no application configuration found in secure store", "scope", config.ScopeApplication)
 		os.Exit(1)
 	}
 	if appFormat != "toml" {
@@ -109,20 +78,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	var appCfg config.Config
-	err = toml.Unmarshal(appTomlData, &appCfg)
+	appCfg := config.NewDefaultConfig()
+	err = toml.Unmarshal(appTomlData, appCfg)
 	if err != nil {
 		logger.Error("failed to unmarshal application config TOML data", "scope", config.ScopeApplication, "error", err)
 		os.Exit(1)
 	}
 	logger.Info("Successfully loaded and unmarshalled application configuration", "scope", config.ScopeApplication)
 
-	// --- Update Application Config with Cert Data ---
-	logger.Info("Updating application config with certificate data")
-	appCfg.Server.CertData = certData.CertificateChain
-	appCfg.Server.KeyData = certData.PrivateKey
+	// --- Move the Staged Certificate into the Server TLS Settings ---
+	if appCfg.Acme.Certificate == "" || appCfg.Acme.PrivateKey == "" {
+		logger.Error("no staged certificate found in the acme section", "scope", config.ScopeApplication)
+		os.Exit(1)
+	}
 
-	// --- Marshal Updated Application Config ---
+	logger.Info("Moving the staged certificate into the server TLS settings", "domains", appCfg.Acme.Domains)
+	appCfg.Server.Tls.Certificate = appCfg.Acme.Certificate
+	appCfg.Server.Tls.PrivateKey = appCfg.Acme.PrivateKey
+
+	// --- Marshal and Save the Updated Application Config ---
 	updatedAppTomlBytes, err := toml.Marshal(appCfg)
 	if err != nil {
 		logger.Error("failed to marshal updated application config to TOML", "error", err)
@@ -130,7 +104,7 @@ func main() {
 	}
 
 	// --- Save Updated Application Config ---
-	description := fmt.Sprintf("Updated TLS cert/key data from certificate store (identifier: %s)", certData.Identifier)
+	description := fmt.Sprintf("Deployed staged certificate for domains: %v", appCfg.Acme.Domains)
 	logger.Info("Saving updated application configuration", "scope", config.ScopeApplication)
 	err = secureCfg.Save(config.ScopeApplication, updatedAppTomlBytes, "toml", description)
 	if err != nil {
@@ -138,5 +112,5 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger.Info("Successfully updated application configuration with latest certificate data.")
+	logger.Info("Successfully moved the staged certificate into the server TLS settings.")
 }

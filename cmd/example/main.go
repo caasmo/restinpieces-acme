@@ -9,7 +9,6 @@ import (
 	"github.com/caasmo/restinpieces"
 
 	"github.com/caasmo/restinpieces-acme"
-	"github.com/pelletier/go-toml/v2"
 )
 
 const JobTypeAcmeCert = "job_type_acme_cert"
@@ -63,33 +62,7 @@ func main() {
 	// Re-assign logger to the one provided by the app, as it might have additional context or handlers.
 	logger = app.Logger()
 
-	// --- Load ACME Renewal Config from SecureConfigStore ---
-	logger.Info("Loading ACME configuration from database", "scope", acme.ScopeConfig)
-	configTomlData, format, err := app.ConfigStore().Get(acme.ScopeConfig, 0)
-	if err != nil {
-		logger.Error("failed to load ACME config from DB", "scope", acme.ScopeConfig, "error", err)
-		os.Exit(1)
-	}
-	if len(configTomlData) == 0 {
-		logger.Error("ACME config data loaded from DB is empty", "scope", acme.ScopeConfig)
-		os.Exit(1)
-	}
-
-	// Check if the format is TOML before unmarshalling
-	if format != "toml" {
-		logger.Error("ACME config data is not in TOML format", "scope", acme.ScopeConfig, "expected_format", "toml", "actual_format", format)
-		os.Exit(1)
-	}
-
-	var renewalCfg acme.Config
-	err = toml.Unmarshal(configTomlData, &renewalCfg)
-	if err != nil {
-		logger.Error("failed to unmarshal ACME TOML config", "scope", acme.ScopeConfig, "error", err)
-		os.Exit(1)
-	}
-	logger.Info("Successfully unmarshalled ACME config", "scope", acme.ScopeConfig)
-
-	certHandler := acme.NewCertHandler(&renewalCfg, app.ConfigStore(), logger)
+	certHandler := acme.NewCertHandler(app.ConfigStore(), logger)
 
 	err = srv.AddJobHandler(JobTypeAcmeCert, certHandler)
 	if err != nil {

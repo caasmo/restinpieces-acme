@@ -1,4 +1,4 @@
-// Package acme renews TLS certificates with Let's Encrypt and stores them in
+// Package acme obtains TLS certificates with Let's Encrypt and stages them in
 // the application's encrypted configuration store.
 //
 // A TLS certificate proves to a browser that it is talking to the real
@@ -7,15 +7,16 @@
 // (Automatic Certificate Management Environment), the protocol this package
 // speaks.
 //
-// The proof used here is the DNS-01 challenge. The package asks the DNS
+// The proof used here is the dns-01 challenge. The package asks the DNS
 // provider that hosts the domain to publish a temporary TXT record, Let's
 // Encrypt reads that record from the public DNS, and only then issues the
-// certificate. DNS-01 is the only challenge type that can issue a wildcard
+// certificate. dns-01 is the only challenge type that can issue a wildcard
 // certificate such as "*.example.com".
 //
-// The renewal settings live in Config and are read from the encrypted store.
-// The obtained certificate is written back to the encrypted store as Cert, so
-// another command can install it into the web server.
+// The settings live in the Acme section of the application configuration. The
+// obtained certificate is staged back into the same section as Certificate and
+// PrivateKey, ready for the deploy step that moves them into the server's TLS
+// settings.
 package acme
 
 import (
@@ -43,121 +44,34 @@ import (
 	"github.com/go-acme/lego/v5/registration"
 )
 
-const (
-	// ScopeConfig is the encrypted-store scope that holds the renewal settings
-	// (Config): the account email, the domains, the DNS provider credentials
-	// and the ACME account key.
-	ScopeConfig = "acme_config"
-	// ScopeAcmeCertificate is the encrypted-store scope that holds the most
-	// recently obtained certificate (Cert): the certificate chain and the
-	// private key that matches it.
-	ScopeAcmeCertificate = "acme_certificate"
-	// DNSProviderCloudflare is the provider name for Cloudflare in the
-	// DNSProviders map of Config.
-	DNSProviderCloudflare = "cloudflare"
-)
+// DNSProviderCloudflare is the provider name for Cloudflare in an acme.dns-01
+// entry.
+const DNSProviderCloudflare = "cloudflare"
 
-// dnsQueryTimeout bounds one DNS lookup while lego checks the DNS-01 challenge
+// dnsQueryTimeout bounds one DNS lookup while lego checks the dns-01 challenge
 // record. It is applied to lego's shared DNS client.
 const dnsQueryTimeout = 10 * time.Minute
 
-// DNSProvider holds the credentials for one DNS provider. A DNS provider is
-// the service that hosts the domain's DNS records, and can therefore publish
-// the temporary record that the DNS-01 challenge needs.
-type DNSProvider struct {
-	// APIToken is the provider's API token, used to create and remove the
-	// temporary DNS record. For Cloudflare it needs permission to edit DNS
-	// records in the zone.
-	APIToken string
-}
-
-// Config holds the settings for certificate renewal. It is stored encrypted
-// under ScopeConfig and read back as TOML.
-type Config struct {
-	// Email is the contact address for the ACME account. Let's Encrypt uses it
-	// to warn about certificates that are about to expire.
-	Email string
-
-	// Domains lists every name the certificate must cover. For a wildcard
-	// certificate, include both the base domain and the wildcard, for example
-	// ["example.com", "*.example.com"].
-	Domains []string
-
-	// DNSProviders maps a provider name (for example "cloudflare") to its
-	// credentials.
-	DNSProviders map[string]DNSProvider
-
-	// CADirectoryURL is the address of the ACME server. Let's Encrypt runs two
-	// independent servers, staging for testing and production for real
-	// certificates:
-	//
-	//	https://acme-staging-v02.api.letsencrypt.org/directory
-	//	https://acme-v02.api.letsencrypt.org/directory
-	//
-	// The two are separate: an account registered on one is unknown to the
-	// other, so the account key must be registered on each server you use.
-	CADirectoryURL string
-
-	// ActiveDNSProvider names which entry of DNSProviders to use.
-	ActiveDNSProvider string
-
-	// AcmeAccountPrivateKey is the ACME account's private key in PEM form. It
-	// identifies the account, so keep it secret and reuse it to reach the same
-	// account on later runs. lego signs its requests with this key and accepts
-	// ECDSA (P-256 or P-384) and RSA keys; Ed25519 keys are not supported.
-	// Generate an ECDSA P-256 key with:
-	//
-	//	openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out acme_account_ec256.key
-	//
-	// In TOML, paste it as a multi-line literal string ('''...''').
-	AcmeAccountPrivateKey string
-}
-
-// Cert is the certificate we obtained, stored encrypted under
-// ScopeAcmeCertificate as TOML.
-//
-// A certificate is not a single document. The server needs the certificate
-// itself plus the intermediate certificate that signed it, so that clients can
-// follow the chain up to a root they already trust; that pair is
-// CertificateChain. The matching private key is stored in PrivateKey. Both are
-// PEM text: a header, a block of base64, and a footer.
-type Cert struct {
-	// Identifier is a label for this certificate, taken from its main domain.
-	Identifier string
-	// Domains lists every name the certificate covers.
-	Domains []string
-	// CertificateChain is the PEM-encoded certificate followed by the
-	// intermediate certificate that signed it.
-	CertificateChain string
-	// PrivateKey is the PEM-encoded private key matching the certificate. It is
-	// sensitive: anyone who has it can impersonate the domain.
-	PrivateKey string
-	// IssuedAt is when the certificate became valid (its NotBefore time).
-	IssuedAt time.Time
-	// ExpiresAt is when the certificate stops being valid (its NotAfter time).
-	ExpiresAt time.Time
-}
-
 // CertHandler obtains a certificate when the job queue runs an acme_cert job.
 type CertHandler struct {
-	config            *Config
 	secureConfigStore config.SecureStore
 	logger            *slog.Logger
 }
 
-// NewCertHandler builds a handler from the certificate settings, the encrypted
-// store used to save the certificate, and a logger. It also points lego's own
-// logger at the handler's logger, so lego's step logs (DNS-01 progress, order
-// validation) share the same format and level as the handler's lines.
-func NewCertHandler(cfg *Config, store config.SecureStore, logger *slog.Logger) *CertHandler {
-	if cfg == nil || store == nil || logger == nil {
-		panic("NewCertHandler: received nil config, store, or logger")
+// NewCertHandler builds a handler from the encrypted store that holds the
+// application configuration, and a logger. The handler reads the configuration
+// from the store at each request and stages the obtained certificate back into
+// it. It also points lego's own logger at the handler's logger, so lego's step
+// logs (dns-01 progress, order validation) share the same format and level as
+// the handler's lines.
+func NewCertHandler(store config.SecureStore, logger *slog.Logger) *CertHandler {
+	if store == nil || logger == nil {
+		panic("NewCertHandler: received nil store or logger")
 	}
 	handlerLogger := logger.With("job_handler", "acme_cert")
 	legolog.SetDefault(handlerLogger)
 
 	return &CertHandler{
-		config:            cfg,
 		secureConfigStore: store,
 		logger:            handlerLogger,
 	}
@@ -183,31 +97,37 @@ func (u *AcmeUser) GetRegistration() *legoacme.ExtendedAccount { return u.Regist
 // requests it sends to the ACME server.
 func (u *AcmeUser) GetPrivateKey() crypto.Signer { return u.PrivateKey }
 
-// Handle obtains a certificate. The job queue calls it for each acme_cert
-// job; the job value itself is not used.
+// Handle obtains a certificate and stages it in the Acme section of the
+// application configuration. It reads the configuration from the encrypted
+// store at the start, so it always sees the latest saved values. The job
+// queue calls it for each acme_cert job; the job value itself is not used.
 //
-// The steps follow the ACME order of operations: parse the account key and
-// build a client for the configured ACME server, select the DNS provider and
-// register the DNS-01 solver, register the account (idempotent, so an existing
-// account is looked up rather than created), obtain the certificate, and save
-// it to the encrypted store.
+// The steps follow the ACME order of operations: load the application config,
+// parse the account key and build a client for the configured ACME server,
+// select the dns-01 entry and register its solver, register the account
+// (idempotent, so an existing account is looked up rather than created),
+// obtain the certificate, and stage it.
 func (h *CertHandler) Handle(ctx context.Context, job db.Job) error {
-	cfg := h.config
+	cfg, err := h.loadApplicationConfig()
+	if err != nil {
+		return err
+	}
+	acmeCfg := cfg.Acme
 
-	h.logger.Info("Attempting certificate renewal process", "domains", cfg.Domains)
+	h.logger.Info("Attempting certificate request", "domains", acmeCfg.Domains)
 
 	// --- ACME client ---
 	// The account key is the account's identity, a private key in PEM form.
 	// Parse it into a crypto.Signer that lego can use.
-	acmePrivateKey, err := certcrypto.ParsePEMPrivateKey([]byte(cfg.AcmeAccountPrivateKey))
+	acmePrivateKey, err := certcrypto.ParsePEMPrivateKey([]byte(acmeCfg.Account.Key))
 	if err != nil {
 		h.logger.Error("Failed to parse ACME account private key from config", "error", err)
 		return fmt.Errorf("failed to parse ACME account private key: %w", err)
 	}
 
-	acmeUser := AcmeUser{Email: cfg.Email, PrivateKey: acmePrivateKey}
+	acmeUser := AcmeUser{Email: acmeCfg.Account.Email, PrivateKey: acmePrivateKey}
 	legoConfig := lego.NewConfig(&acmeUser)
-	legoConfig.CADirURL = cfg.CADirectoryURL
+	legoConfig.CADirURL = acmeCfg.CADirectoryURL
 
 	legoClient, err := lego.NewClient(legoConfig)
 	if err != nil {
@@ -216,22 +136,14 @@ func (h *CertHandler) Handle(ctx context.Context, job db.Job) error {
 	}
 
 	// --- DNS provider ---
-	providerName := cfg.ActiveDNSProvider
-	if providerName == "" {
-		err := fmt.Errorf("ActiveDNSProvider field is missing or empty in ACME configuration")
+	entryLabel, entry, err := dns01Entry(acmeCfg.DNS01)
+	if err != nil {
 		h.logger.Error(err.Error())
 		return err
 	}
-	h.logger.Debug("Using configured DNS provider", "provider_name", providerName)
+	h.logger.Debug("Using dns-01 entry", "entry", entryLabel, "provider", entry.Provider)
 
-	providerConfig, ok := cfg.DNSProviders[providerName]
-	if !ok {
-		err := fmt.Errorf("configured ActiveDNSProvider '%s' not found in DNSProviders map", providerName)
-		h.logger.Error(err.Error())
-		return err
-	}
-
-	dnsProvider, err := getDNSProvider(providerName, providerConfig, h.logger)
+	dnsProvider, err := getDNSProvider(entryLabel, entry, h.logger)
 	if err != nil {
 		return err
 	}
@@ -251,7 +163,7 @@ func (h *CertHandler) Handle(ctx context.Context, job db.Job) error {
 	// check that matters.
 	err = legoClient.Challenge.SetDNS01Provider(dnsProvider, dns01.DisableRecursiveNSsPropagationRequirement())
 	if err != nil {
-		h.logger.Error("Failed to set DNS01 provider", "provider", providerName, "error", err)
+		h.logger.Error("Failed to set DNS01 provider", "provider", entry.Provider, "error", err)
 		return fmt.Errorf("failed to set DNS01 provider: %w", err)
 	}
 
@@ -270,7 +182,7 @@ func (h *CertHandler) Handle(ctx context.Context, job db.Job) error {
 	// Bundle asks for the full chain (the certificate plus its intermediate).
 	// KeyType asks for an ECDSA P-256 key pair for the certificate.
 	request := certificate.ObtainRequest{
-		Domains: cfg.Domains,
+		Domains: acmeCfg.Domains,
 		Bundle:  true,
 		KeyType: certcrypto.EC256,
 	}
@@ -284,22 +196,85 @@ func (h *CertHandler) Handle(ctx context.Context, job db.Job) error {
 	}
 	h.logger.Info("Successfully obtained certificate", "domains", request.Domains, "certificate_url", resource.CertURL)
 
-	err = h.saveCertificate(resource)
+	err = h.saveCertificate(cfg, resource)
 	if err != nil {
 		return err
 	}
 
-	h.logger.Info("Successfully processed certificate renewal job.", "domains", request.Domains)
+	h.logger.Info("Successfully processed certificate request.", "domains", request.Domains)
 	return nil
 }
 
-// getDNSProvider builds the DNS provider that lego uses to publish the DNS-01
-// challenge record.
-func getDNSProvider(providerName string, providerConfig DNSProvider, logger *slog.Logger) (challenge.Provider, error) {
-	switch providerName {
+// loadApplicationConfig reads the application configuration from the encrypted
+// store and merges it over the framework defaults, so the handler works with
+// the same configuration the application runs with.
+func (h *CertHandler) loadApplicationConfig() (*config.Config, error) {
+	tomlData, format, err := h.secureConfigStore.Get(config.ScopeApplication, 0)
+	if err != nil {
+		h.logger.Error("Failed to load application config from secure store", "scope", config.ScopeApplication, "error", err)
+		return nil, fmt.Errorf("failed to load application config: %w", err)
+	}
+	if len(tomlData) == 0 {
+		err := fmt.Errorf("application config loaded from secure store is empty")
+		h.logger.Error(err.Error(), "scope", config.ScopeApplication)
+		return nil, err
+	}
+	if format != "toml" {
+		err := fmt.Errorf("application config is not in TOML format, got %q", format)
+		h.logger.Error(err.Error(), "scope", config.ScopeApplication)
+		return nil, err
+	}
+
+	cfg := config.NewDefaultConfig()
+	err = toml.Unmarshal(tomlData, cfg)
+	if err != nil {
+		h.logger.Error("Failed to unmarshal application config", "scope", config.ScopeApplication, "error", err)
+		return nil, fmt.Errorf("failed to unmarshal application config: %w", err)
+	}
+
+	return cfg, nil
+}
+
+// dns01Entry returns the single dns-01 entry that has a provider set. An empty
+// provider deactivates an entry, so exactly one entry must be active for a
+// request to have a DNS provider.
+func dns01Entry(entries config.AcmeDNS01) (string, config.AcmeDNS01Entry, error) {
+	label := ""
+	var entry config.AcmeDNS01Entry
+
+	for key, candidate := range entries {
+		if candidate.Provider == "" {
+			continue
+		}
+		if label != "" {
+			return "", config.AcmeDNS01Entry{}, fmt.Errorf("acme.dns-01 has more than one active entry: %q and %q", label, key)
+		}
+		label = key
+		entry = candidate
+	}
+
+	if label == "" {
+		return "", config.AcmeDNS01Entry{}, fmt.Errorf("acme.dns-01 has no active entry: set provider on exactly one entry")
+	}
+
+	return label, entry, nil
+}
+
+// getDNSProvider builds the DNS provider that lego uses to publish the dns-01
+// challenge record. The entry's credentials are read by key, so each provider
+// implementation documents the keys it needs.
+func getDNSProvider(entryLabel string, entry config.AcmeDNS01Entry, logger *slog.Logger) (challenge.Provider, error) {
+	switch entry.Provider {
 	case DNSProviderCloudflare:
+		apiToken := entry.Credentials["api_token"]
+		if apiToken == "" {
+			err := fmt.Errorf("acme.dns-01.%s.credentials.api_token is empty", entryLabel)
+			logger.Error(err.Error())
+			return nil, err
+		}
+
 		cfLegoConfig := cloudflare.NewDefaultConfig()
-		cfLegoConfig.AuthToken = providerConfig.APIToken
+		cfLegoConfig.AuthToken = apiToken
 		// Add other Cloudflare settings here if the authentication method needs
 		// them, for example ZoneToken.
 
@@ -310,17 +285,18 @@ func getDNSProvider(providerName string, providerConfig DNSProvider, logger *slo
 		}
 		return cfProvider, nil
 	default:
-		err := fmt.Errorf("unsupported DNS provider configured: %q", providerName)
+		err := fmt.Errorf("unsupported DNS provider configured: %q", entry.Provider)
 		logger.Error(err.Error())
 		return nil, err
 	}
 }
 
-// saveCertificate reads the validity dates from the obtained certificate and
-// stores the certificate chain and its private key in the encrypted store.
-func (h *CertHandler) saveCertificate(resource *certificate.Resource) error {
+// saveCertificate stages the obtained certificate chain and its private key in
+// the Acme section of the application configuration, so the deploy step can
+// move them into the server's TLS settings.
+func (h *CertHandler) saveCertificate(cfg *config.Config, resource *certificate.Resource) error {
 	// The chain starts with the certificate itself. Decode it to read when it
-	// becomes valid and when it expires.
+	// expires for the stored version's description.
 	block, _ := pem.Decode(resource.Certificate)
 	if block == nil {
 		err := fmt.Errorf("failed to decode PEM block from obtained certificate chain")
@@ -334,31 +310,25 @@ func (h *CertHandler) saveCertificate(resource *certificate.Resource) error {
 		return err
 	}
 
-	certData := Cert{
-		Identifier:       resource.ID,
-		Domains:          resource.Domains,
-		CertificateChain: string(resource.Certificate),
-		PrivateKey:       string(resource.PrivateKey),
-		IssuedAt:         cert.NotBefore.UTC(),
-		ExpiresAt:        cert.NotAfter.UTC(),
+	cfg.Acme.Certificate = string(resource.Certificate)
+	cfg.Acme.PrivateKey = string(resource.PrivateKey)
+
+	tomlBytes, err := toml.Marshal(cfg)
+	if err != nil {
+		h.logger.Error("Failed to marshal application config to TOML", "error", err)
+		return fmt.Errorf("failed to marshal application config to TOML: %w", err)
 	}
 
-	tomlBytes, err := toml.Marshal(certData)
-	if err != nil {
-		h.logger.Error("Failed to marshal certificate data to TOML", "error", err)
-		return fmt.Errorf("failed to marshal certificate data to TOML: %w", err)
-	}
+	expiryStr := cert.NotAfter.UTC().Format(time.RFC3339)
+	description := fmt.Sprintf("Staged certificate for domains: %s (expires %s)", strings.Join(resource.Domains, ", "), expiryStr)
 
-	expiryStr := certData.ExpiresAt.Format(time.RFC3339)
-	description := fmt.Sprintf("Obtained certificate for domains: %s (expires %s)", strings.Join(certData.Domains, ", "), expiryStr)
-
-	h.logger.Info("Saving obtained certificate configuration", "scope", ScopeAcmeCertificate, "format", "toml", "identifier", certData.Identifier)
-	err = h.secureConfigStore.Save(ScopeAcmeCertificate, tomlBytes, "toml", description)
+	h.logger.Info("Staging obtained certificate", "scope", config.ScopeApplication, "format", "toml", "identifier", resource.ID)
+	err = h.secureConfigStore.Save(config.ScopeApplication, tomlBytes, "toml", description)
 	if err != nil {
-		h.logger.Error("Failed to save certificate config via SecureConfigStore", "scope", ScopeAcmeCertificate, "error", err)
+		h.logger.Error("Failed to save application config via SecureConfigStore", "scope", config.ScopeApplication, "error", err)
 		return err
 	}
 
-	h.logger.Info("Successfully saved certificate configuration", "scope", ScopeAcmeCertificate, "identifier", certData.Identifier)
+	h.logger.Info("Successfully staged certificate", "scope", config.ScopeApplication, "identifier", resource.ID)
 	return nil
 }

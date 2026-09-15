@@ -8,6 +8,8 @@ require (
 	github.com/pelletier/go-toml/v2 v2.4.3
 )
 
+replace github.com/caasmo/restinpieces => ../restinpieces
+
 require (
 	filippo.io/age v1.2.1 // indirect
 	github.com/OneOfOne/xxhash v1.2.8 // indirect
