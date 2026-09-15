@@ -9,7 +9,7 @@ import (
 	"github.com/caasmo/restinpieces"
 	"github.com/caasmo/restinpieces-acme"
 	"github.com/caasmo/restinpieces/config"
-	dbz "github.com/caasmo/restinpieces/db/zombiezen"
+	"github.com/caasmo/restinpieces/db/databasesql"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -19,12 +19,12 @@ func main() {
 	}))
 
 	dbPathFlag := flag.String("dbpath", "", "Path to the SQLite database file (required)")
-	ageIdentityPathFlag := flag.String("age-key", "", "Path to the age identity file (private key 'AGE-SECRET-KEY-1...') (required)")
+	ageIdentityPathFlag := flag.String("agekey", "", "Path to the age identity file (private key 'AGE-SECRET-KEY-1...') (required)")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s -dbpath <db-file> -age-key <identity-file>\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Updates the main application configuration with the latest certificate data from the secure store.\n")
-		fmt.Fprintf(os.Stderr, "Options:\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: %s -dbpath <db-file> -agekey <identity-file>\n", os.Args[0])
+		_, _ = fmt.Fprintf(os.Stderr, "Updates the main application configuration with the latest certificate data from the secure store.\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Options:\n")
 		flag.PrintDefaults()
 	}
 
@@ -37,26 +37,27 @@ func main() {
 
 	// --- Database Setup ---
 	logger.Info("Creating sqlite database pool", "path", *dbPathFlag)
-	pool, err := restinpieces.NewZombiezenPool(*dbPathFlag)
+	pool, err := restinpieces.NewModerncPool(*dbPathFlag)
 	if err != nil {
 		logger.Error("failed to create database pool", "db_path", *dbPathFlag, "error", err)
 		os.Exit(1)
 	}
 	defer func() {
 		logger.Info("Closing database pool")
-		if err := pool.Close(); err != nil {
-			logger.Error("error closing database pool", "error", err)
+		closeErr := pool.Close()
+		if closeErr != nil {
+			logger.Error("error closing database pool", "error", closeErr)
 		}
 	}()
 
-	dbImpl, err := dbz.New(pool)
+	dbImpl, err := databasesql.New(pool)
 	if err != nil {
-		logger.Error("failed to instantiate zombiezen db from pool", "error", err)
+		logger.Error("failed to instantiate sqlite db from pool", "error", err)
 		os.Exit(1)
 	}
 
 	// --- Instantiate SecureConfig ---
-	secureCfg, err := config.NewSecureConfigAge(dbImpl, *ageIdentityPathFlag, logger)
+	secureCfg, err := config.NewSecureStoreAge(dbImpl, *ageIdentityPathFlag)
 	if err != nil {
 		logger.Error("failed to instantiate secure config (age)", "age_key_path", *ageIdentityPathFlag, "error", err)
 		os.Exit(1)
@@ -64,7 +65,7 @@ func main() {
 
 	// --- Load Latest Certificate Data ---
 	logger.Info("Loading latest certificate data", "scope", acme.ScopeAcmeCertificate)
-	certTomlData, err := secureCfg.Latest(acme.ScopeAcmeCertificate)
+	certTomlData, certFormat, err := secureCfg.Get(acme.ScopeAcmeCertificate, 0)
 	if err != nil {
 		logger.Error("failed to load certificate data from secure store", "scope", acme.ScopeAcmeCertificate, "error", err)
 		os.Exit(1)
@@ -73,9 +74,14 @@ func main() {
 		logger.Error("no certificate data found in secure store", "scope", acme.ScopeAcmeCertificate)
 		os.Exit(1)
 	}
+	if certFormat != "toml" {
+		logger.Error("certificate data is not in TOML format", "scope", acme.ScopeAcmeCertificate, "expected_format", "toml", "actual_format", certFormat)
+		os.Exit(1)
+	}
 
 	var certData acme.Cert
-	if err := toml.Unmarshal(certTomlData, &certData); err != nil {
+	err = toml.Unmarshal(certTomlData, &certData)
+	if err != nil {
 		logger.Error("failed to unmarshal certificate TOML data", "scope", acme.ScopeAcmeCertificate, "error", err)
 		os.Exit(1)
 	}
@@ -89,21 +95,23 @@ func main() {
 
 	// --- Load Latest Application Config ---
 	logger.Info("Loading latest application configuration", "scope", config.ScopeApplication)
-	appTomlData, err := secureCfg.Latest(config.ScopeApplication)
+	appTomlData, appFormat, err := secureCfg.Get(config.ScopeApplication, 0)
 	if err != nil {
 		logger.Error("failed to load application config from secure store", "scope", config.ScopeApplication, "error", err)
 		os.Exit(1)
 	}
 	if len(appTomlData) == 0 {
-		// This might be okay if it's the very first time, but usually an app config should exist.
 		logger.Warn("no existing application configuration found in secure store", "scope", config.ScopeApplication)
-		// Decide if this is an error or if we should proceed with a default/empty config
-		// For now, let's treat it as an error, assuming an app config should exist to be updated.
+		os.Exit(1)
+	}
+	if appFormat != "toml" {
+		logger.Error("application config is not in TOML format", "scope", config.ScopeApplication, "expected_format", "toml", "actual_format", appFormat)
 		os.Exit(1)
 	}
 
 	var appCfg config.Config
-	if err := toml.Unmarshal(appTomlData, &appCfg); err != nil {
+	err = toml.Unmarshal(appTomlData, &appCfg)
+	if err != nil {
 		logger.Error("failed to unmarshal application config TOML data", "scope", config.ScopeApplication, "error", err)
 		os.Exit(1)
 	}

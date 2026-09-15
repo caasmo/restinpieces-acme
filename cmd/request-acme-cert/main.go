@@ -11,8 +11,8 @@ import (
 	"github.com/caasmo/restinpieces"
 	"github.com/caasmo/restinpieces-acme"
 	"github.com/caasmo/restinpieces/config"
-	db "github.com/caasmo/restinpieces/db"
-	dbz "github.com/caasmo/restinpieces/db/zombiezen"
+	"github.com/caasmo/restinpieces/db"
+	"github.com/caasmo/restinpieces/db/databasesql"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -28,12 +28,12 @@ func main() {
 
 	// --- Flags ---
 	dbPath := flag.String("dbpath", "app.db", "path to SQLite database file")
-	ageKeyPath := flag.String("age-key", "", "Path to the age identity (private key) file (required)")
+	ageKeyPath := flag.String("agekey", "", "Path to the age identity (private key) file (required)")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s -dbpath <db-path> -age-key <id-path>\n\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "Runs the ACME certificate renewal process using config from the database.\n\n")
-		fmt.Fprintf(os.Stderr, "Flags:\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Usage: %s -dbpath <db-path> -agekey <id-path>\n\n", os.Args[0])
+		_, _ = fmt.Fprintf(os.Stderr, "Runs the ACME certificate renewal process using config from the database.\n\n")
+		_, _ = fmt.Fprintf(os.Stderr, "Flags:\n")
 		flag.PrintDefaults()
 	}
 
@@ -46,51 +46,58 @@ func main() {
 
 	// --- Database Connection ---
 	logger.Info("Connecting to database pool...", "path", *dbPath)
-	pool, err := restinpieces.NewZombiezenPool(*dbPath)
+	pool, err := restinpieces.NewModerncPool(*dbPath)
 	if err != nil {
 		logger.Error("Failed to open database pool", "path", *dbPath, "error", err)
 		os.Exit(1)
 	}
 	defer func() {
 		logger.Info("Closing database pool...")
-		if err := pool.Close(); err != nil {
-			logger.Error("Failed to close database pool", "error", err)
+		closeErr := pool.Close()
+		if closeErr != nil {
+			logger.Error("Failed to close database pool", "error", closeErr)
 		}
 	}()
 
 	// --- Secure Config Store ---
-	dbImpl, err := dbz.New(pool) // Create zombiezen db implementation from pool
+	dbImpl, err := databasesql.New(pool)
 	if err != nil {
-		logger.Error("failed to instantiate zombiezen db from pool", "error", err)
+		logger.Error("failed to instantiate sqlite db from pool", "error", err)
 		os.Exit(1)
 	}
-	secureCfgStore, err := config.NewSecureConfigAge(dbImpl, *ageKeyPath, logger)
+
+	secureCfgStore, err := config.NewSecureStoreAge(dbImpl, *ageKeyPath)
 	if err != nil {
 		logger.Error("failed to instantiate secure config (age)", "age_key_path", *ageKeyPath, "error", err)
 		os.Exit(1)
 	}
 
 	// --- Load ACME Config from Secure Store ---
-	logger.Info("Loading ACME configuration from database", "scope", acme.ConfigScope)
-	encryptedTomlData, err := secureCfgStore.Latest(acme.ConfigScope)
+	logger.Info("Loading ACME configuration from database", "scope", acme.ScopeConfig)
+	configTomlData, format, err := secureCfgStore.Get(acme.ScopeConfig, 0)
 	if err != nil {
-		logger.Error("failed to load ACME config from DB", "scope", acme.ConfigScope, "error", err)
+		logger.Error("failed to load ACME config from DB", "scope", acme.ScopeConfig, "error", err)
 		os.Exit(1)
 	}
-	if len(encryptedTomlData) == 0 {
-		logger.Error("ACME config data loaded from DB is empty", "scope", acme.ConfigScope)
+	if len(configTomlData) == 0 {
+		logger.Error("ACME config data loaded from DB is empty", "scope", acme.ScopeConfig)
+		os.Exit(1)
+	}
+	if format != "toml" {
+		logger.Error("ACME config data is not in TOML format", "scope", acme.ScopeConfig, "expected_format", "toml", "actual_format", format)
 		os.Exit(1)
 	}
 
 	var renewalCfg acme.Config
-	if err := toml.Unmarshal(encryptedTomlData, &renewalCfg); err != nil {
-		logger.Error("failed to unmarshal ACME TOML config", "scope", acme.ConfigScope, "error", err)
+	err = toml.Unmarshal(configTomlData, &renewalCfg)
+	if err != nil {
+		logger.Error("failed to unmarshal ACME TOML config", "scope", acme.ScopeConfig, "error", err)
 		os.Exit(1)
 	}
-	logger.Info("Successfully unmarshalled ACME config", "scope", acme.ConfigScope)
+	logger.Info("Successfully unmarshalled ACME config", "scope", acme.ScopeConfig)
 
 	// --- Handler Instantiation ---
-	renewalHandler := acme.NewCertRenewalHandler(&renewalCfg, secureCfgStore, logger)
+	certHandler := acme.NewCertHandler(&renewalCfg, secureCfgStore, logger)
 
 	// --- Job Execution ---
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
@@ -100,8 +107,7 @@ func main() {
 	dummyJob := db.Job{ID: 1}
 
 	logger.Info("Executing ACME Handle method...")
-	os.Exit(1)
-	err = renewalHandler.Handle(ctx, dummyJob)
+	err = certHandler.Handle(ctx, dummyJob)
 
 	// --- Result ---
 	if err != nil {
@@ -110,6 +116,6 @@ func main() {
 	}
 
 	logger.Info("Handler execution completed successfully.")
-	logger.Info("Certificate should now be saved in the database via SecureConfigStore.", "db_path", *dbPath, "scope", acme.CertificateOutputScope)
-	logger.Info("You can check the database content using sqlite tools or a config dump command.")
+	logger.Info("Certificate should now be saved in the database via SecureConfigStore.", "db_path", *dbPath, "scope", acme.ScopeAcmeCertificate)
+	logger.Info("You can check the database content using sqlite commands or a config dump command.")
 }

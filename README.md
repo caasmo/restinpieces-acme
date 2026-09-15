@@ -31,37 +31,33 @@ This Go package provides functionality for automating ACME (Let's Encrypt) certi
      Then copy the contents into the `AcmeAccountPrivateKey` field.
 
 3. **Encrypt Configuration**: 
-   Use the `insert-config` command to encrypt and store the configuration:
+   Use the `ripc save` command to encrypt and store the configuration:
    ```bash
-   go run ../restinpieces/cmd/insert-config/main.go \
-     --scope acme_config \
-     --file acme.blueprint.toml \
-     --age-key path/to/age.key \
-     --db path/to/database.db
+   go run ../restinpieces/cmd/ripc -dbpath path/to/database.db -agekey path/to/age.key save --scope acme_config acme.blueprint.toml
    ```
    See all available commands in the [restinpieces CLI documentation](https://github.com/caasmo/restinpieces/tree/main/cmd).
 
 4. **Initial Request (Optional but Recommended)**:
    ```bash
-   go run ./cmd/request-acme-cert -dbpath <db-path> -age-key <id-path>
+   go run ./cmd/request-acme-cert -dbpath <db-path> -agekey <id-path>
    ```
    Ensure necessary environment variables/flags are set.
 
 5. **Integrate Handler**: 
-   Use `cmd/example` as a reference to register `acme.CertRenewalHandler` in your framework application and schedule recurring jobs.
+   Use `cmd/example` as a reference to register `acme.CertHandler` in your framework application and schedule recurring jobs.
 
 6. **Deploy Certificate**:
    ```bash
-   go run ./cmd/update-app-certificate -dbpath <db-path> -age-key <id-path>
+   go run ./cmd/update-app-certificate -dbpath <db-path> -agekey <id-path>
    ```
    Run this after successful renewals to deploy the new certificate.
 
 
 ## Core Package (`acme`)
 
-The `acme` package (`AcmeCertRenewal.go`) contains the primary logic:
+The `acme` package (`acme_cert.go`) contains the primary logic:
 
-*   `CertRenewalHandler`: Implements the job handler interface from [restinpieces](https://github.com/caasmo/restinpieces). This is the core component responsible for performing the certificate renewal process when triggered as a job.
+*   `CertHandler`: Implements the job handler interface from [restinpieces](https://github.com/caasmo/restinpieces). This is the core component responsible for performing the certificate renewal process when triggered as a job.
 *   `Config`: Struct defining the necessary configuration (email, domains, DNS provider details, ACME account key).
 *   `Cert`: Struct representing the stored certificate data (certificate chain, private key, expiry).
 *   Support for DNS providers (currently Cloudflare).
@@ -73,18 +69,18 @@ This repository includes several command-line utilities built using the `acme` p
 ### `example`
 
 **Purpose**:  
-Demonstrates how to integrate the `acme.CertRenewalHandler` into a [restinpieces](https://github.com/caasmo/restinpieces) application.
+Demonstrates how to integrate the `acme.CertHandler` into a [restinpieces](https://github.com/caasmo/restinpieces) application.
 
 **Functionality**:  
 - Initializes the framework components (database, secure config store)
 - Loads the ACME configuration (`acme.Config`) from the secure store
-- Creates an instance of `acme.NewCertRenewalHandler`
-- Registers the handler with the framework's job runner for the `certificate_renewal` job type
+- Creates an instance of `acme.NewCertHandler`
+- Registers the handler with the framework's job runner for the `job_type_acme_cert` job type
 - Starts the framework server/runner
 
 **Usage**:  
 ```bash
-go run ./cmd/example -db <path-to-db> -age-key <path-to-identity>
+go run ./cmd/example -dbpath <path-to-db> -agekey <path-to-identity>
 ```
 
 ### `generate-blueprint-config`
@@ -118,7 +114,7 @@ Manually triggers an ACME certificate request or renewal process *outside* the f
 
 **Usage**:  
 ```bash
-go run ./cmd/request-acme-cert -db <path> -age-key <path>
+go run ./cmd/request-acme-cert -dbpath <path> -agekey <path>
 ```
 
 ### `update-app-certificate`
@@ -133,5 +129,5 @@ Retrieves the latest certificate and updates a target application's configuratio
 
 **Usage**:  
 ```bash
-go run ./cmd/update-app-certificate -dbpath <path> -age-key <path>
+go run ./cmd/update-app-certificate -dbpath <path> -agekey <path>
 ```
