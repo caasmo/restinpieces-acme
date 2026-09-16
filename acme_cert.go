@@ -355,9 +355,12 @@ func (h *CertHandler) ariRenewalTime(ctx context.Context, client *lego.Client, l
 		return time.Time{}
 	}
 
-	if renewalInfo.ExplanationURL != "" {
-		h.logger.Info("The CA explained its renewal window", "explanation_url", renewalInfo.ExplanationURL)
-	}
+	h.logger.Info("The CA sent its renewal window",
+		"start", renewalInfo.SuggestedWindow.Start,
+		"end", renewalInfo.SuggestedWindow.End,
+		"retry_after", renewalInfo.RetryAfter,
+		"explanation_url", renewalInfo.ExplanationURL,
+	)
 
 	renewalTime := renewalInfo.ShouldRenewAt(time.Now(), 0)
 	if renewalTime == nil {
