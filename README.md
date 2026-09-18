@@ -2,6 +2,23 @@
 
 This Go package provides functionality for automating ACME (Let's Encrypt) certificate renewals using the DNS-01 challenge. It integrates with the [restinpieces framework](https://github.com/caasmo/restinpieces) for secure configuration storage and job handling.
 
+# Content
+
+- [Features](#features)
+- [Integrate the job in restinpieces](#integrate-the-job-in-restinpieces)
+  - [Register the handler](#register-the-handler)
+  - [Declare the schedule](#declare-the-schedule)
+- [Get a certificate manually](#get-a-certificate-manually)
+  - [Create a scratch database](#create-a-scratch-database)
+  - [Add a dns-01 Entry](#add-a-dns-01-entry)
+  - [Fill the Acme Section](#fill-the-acme-section)
+  - [Request the Certificate](#request-the-certificate)
+  - [Deploy the Certificate](#deploy-the-certificate)
+- [Commands](#commands)
+  - [`example`](#example)
+  - [`request-acme-cert`](#request-acme-cert)
+  - [`update-app-certificate`](#update-app-certificate)
+
 ## Features
 
 *   Automated certificate issuance and renewal via ACME protocol.
@@ -11,20 +28,74 @@ This Go package provides functionality for automating ACME (Let's Encrypt) certi
 *   Provides command-line tools for manual renewal and application certificate updates.
 *   Includes an example demonstrating integration as a job handler within the application framework.
 
-## Getting Started
+## Integrate the job in restinpieces
 
-### Prepare the Application Config
+Certificates are issued by a background job. That takes two steps: register the handler in your code, then declare the schedule with `ripc`.
 
-```bash
-ripc -dbpath app.db -agekey age.key app create
+### Register the handler
+
+Copy what [`cmd/example/main.go`](https://github.com/caasmo/restinpieces-acme/blob/master/cmd/example/main.go) does after `restinpieces.New()` in your app's `main.go`:
+
+```go
+certHandler := acme.NewCertHandler(app.ConfigStore(), logger)
+
+err = srv.AddJobHandler("job_type_acme_cert", certHandler)
+if err != nil {
+    logger.Error("Failed to register certificate job handler", "error", err)
+    os.Exit(1)
+}
 ```
 
-This applies the schema and stores the application configuration with the framework defaults, including the empty `acme` section.
+### Declare the schedule
+
+Each entry under `scheduler.jobs` is one schedule:
+
+```bash
+ripc scaffold job acme_cert
+ripc set scheduler.jobs.acme_cert.job_type job_type_acme_cert
+ripc set scheduler.jobs.acme_cert.activated true
+```
+
+This creates `scheduler.jobs.acme_cert` with a 1h interval. Set it to around 8h — that stays outside the Let's Encrypt retry-later window:
+
+```bash
+ripc set scheduler.jobs.acme_cert.interval 8h
+```
+
+Reload the app so the scheduler picks it up, then verify:
+
+```bash
+ripc get scheduler.jobs.acme_cert
+ripc job list
+```
+
+The scheduler adds one pending run. When it completes, the next run is added automatically. To stop scheduling new runs without removing the entry:
+
+```bash
+ripc set scheduler.jobs.acme_cert.activated false
+```
+
+## Get a certificate manually
+
+Set these once — every `ripc` command below uses them, so the commands leave the flags out:
+
+```bash
+export RIPC_DB=scratch.db
+export RIPC_AGE_KEY_PATH=age.key
+```
+
+### Create a scratch database
+
+```bash
+ripc app create
+```
+
+This creates a throwaway `scratch.db` with the framework defaults, including the empty `acme` section. Everything below runs against it.
 
 ### Add a dns-01 Entry
 
 ```bash
-ripc -dbpath app.db -agekey age.key scaffold acme-dns-01 deeploid_cf
+ripc scaffold acme-dns-01 deeploid_cf
 ```
 
 This creates `acme.dns-01.deeploid_cf` with an empty `provider` and an empty `api_token` credential.
@@ -32,12 +103,12 @@ This creates `acme.dns-01.deeploid_cf` with an empty `provider` and an empty `ap
 ### Fill the Acme Section
 
 ```bash
-ripc -dbpath app.db -agekey age.key set acme.dns-01.deeploid_cf.provider cloudflare
-ripc -dbpath app.db -agekey age.key set acme.dns-01.deeploid_cf.credentials.api_token @/path/to/token
-ripc -dbpath app.db -agekey age.key set acme.account.email 'hostmaster@example.com'
-ripc -dbpath app.db -agekey age.key set acme.account.key @acme_account_ec256.key
-ripc -dbpath app.db -agekey age.key set acme.domains '["example.com", "*.example.com"]'
-ripc -dbpath app.db -agekey age.key set acme.ca_directory_url 'https://acme-staging-v02.api.letsencrypt.org/directory'
+ripc set acme.dns-01.deeploid_cf.provider cloudflare
+ripc set acme.dns-01.deeploid_cf.credentials.api_token @/path/to/token
+ripc set acme.account.email 'hostmaster@example.com'
+ripc set acme.account.key @acme_account_ec256.key
+ripc set acme.domains '["example.com", "*.example.com"]'
+ripc set acme.ca_directory_url 'https://acme-staging-v02.api.letsencrypt.org/directory'
 ```
 
 Generate the account key with:
@@ -49,24 +120,32 @@ openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out acme_account
 ### Request the Certificate
 
 ```bash
-go run ./cmd/request-acme-cert -dbpath app.db -agekey age.key
+go run ./cmd/request-acme-cert -dbpath scratch.db -agekey age.key
 ```
 
+This contacts the CA and stages the new certificate in the application config.
+
 ### Deploy the Certificate
+
+**scratch.db is not the production database.** Export the staged pair from scratch, import it into the production `app.db`, then move it into `server.tls` there:
+
+```bash
+ripc get acme.certificate > cert.pem
+ripc get acme.private_key > key.pem
+ripc -dbpath app.db -agekey age.key set acme.certificate @cert.pem
+ripc -dbpath app.db -agekey age.key set acme.private_key @key.pem
+go run ./cmd/update-app-certificate -dbpath app.db -agekey age.key
+```
+
+Then reload the production app so the server picks up the new `server.tls` values.
+
+**scratch.db already is the production `app.db`.** You ran everything above against the live database, so the staged pair is already where it belongs — just move it into `server.tls` and reload:
 
 ```bash
 go run ./cmd/update-app-certificate -dbpath app.db -agekey age.key
 ```
 
-## Core Package (`acme`)
-
-The `acme` package (`acme_cert.go`) contains the primary logic:
-
-*   `CertHandler`: Implements the job handler interface from [restinpieces](https://github.com/caasmo/restinpieces). This is the core component responsible for performing the certificate renewal process when triggered as a job.
-*   The settings live in the `Acme` section of the application configuration.
-*   Support for DNS providers (currently Cloudflare).
-
-During a renewal, lego calls the Cloudflare API first to publish the `_acme-challenge` TXT record, then polls DNS until the record is visible, and only if that polling succeeds does it call Let's Encrypt to trigger validation.
+This moves the staged certificate into `server.tls`, where the server reads it.
 
 ## Commands
 
