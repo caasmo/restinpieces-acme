@@ -32,6 +32,8 @@ This Go package provides functionality for automating ACME (Let's Encrypt) certi
 
 Certificates are issued by a background job. That takes two steps: register the handler in your code, then declare the schedule with `ripc`.
 
+Prerequisite: the `acme` section must be configured first (provider, credentials, account, domains) — the handler reads it on every run and fails without it. Follow [Get a certificate manually](#get-a-certificate-manually) up to filling the section; skip the request and deploy steps, the job does that part.
+
 ### Register the handler
 
 Copy what [`cmd/example/main.go`](https://github.com/caasmo/restinpieces-acme/blob/master/cmd/example/main.go) does after `restinpieces.New()` in your app's `main.go`:
@@ -95,16 +97,16 @@ This creates a throwaway `scratch.db` with the framework defaults, including the
 ### Add a dns-01 Entry
 
 ```bash
-ripc scaffold acme-dns-01 deeploid_cf
+ripc scaffold acme-dns-01 my_cf
 ```
 
-This creates `acme.dns-01.deeploid_cf` with an empty `provider` and an empty `api_token` credential.
+This creates `acme.dns-01.my_cf` with an empty `provider` and an empty `api_token` credential.
 
 ### Fill the Acme Section
 
 ```bash
-ripc set acme.dns-01.deeploid_cf.provider cloudflare
-ripc set acme.dns-01.deeploid_cf.credentials.api_token @/path/to/token
+ripc set acme.dns-01.my_cf.provider cloudflare
+ripc set acme.dns-01.my_cf.credentials.api_token @/path/to/token
 ripc set acme.account.email 'hostmaster@example.com'
 ripc set acme.account.key @acme_account_ec256.key
 ripc set acme.domains '["example.com", "*.example.com"]'
