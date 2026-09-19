@@ -17,7 +17,6 @@ This Go package provides functionality for automating ACME (Let's Encrypt) certi
 - [Commands](#commands)
   - [`example`](#example)
   - [`request-acme-cert`](#request-acme-cert)
-  - [`update-app-certificate`](#update-app-certificate)
 
 ## Features
 
@@ -25,7 +24,7 @@ This Go package provides functionality for automating ACME (Let's Encrypt) certi
 *   Supports DNS-01 challenge for wildcard certificates.
 *   Currently supports Cloudflare DNS provider (easily extensible).
 *   Secure storage of ACME account keys, configuration, and obtained certificates using `age` encryption via the [restinpieces framework](https://github.com/caasmo/restinpieces).
-*   Provides command-line tools for manual renewal and application certificate updates.
+*   Provides a command-line tool for manual certificate requests and renewals.
 *   Includes an example demonstrating integration as a job handler within the application framework.
 
 ## Integrate the job in restinpieces
@@ -136,7 +135,7 @@ ripc get acme.certificate > cert.pem
 ripc get acme.private_key > key.pem
 ripc -dbpath app.db -agekey age.key set acme.certificate @cert.pem
 ripc -dbpath app.db -agekey age.key set acme.private_key @key.pem
-go run ./cmd/update-app-certificate -dbpath app.db -agekey age.key
+ripc -dbpath app.db -agekey age.key update tls
 ```
 
 Then reload the production app so the server picks up the new `server.tls` values.
@@ -144,7 +143,7 @@ Then reload the production app so the server picks up the new `server.tls` value
 **scratch.db already is the production `app.db`.** You ran everything above against the live database, so the staged pair is already where it belongs — just move it into `server.tls` and reload:
 
 ```bash
-go run ./cmd/update-app-certificate -dbpath app.db -agekey age.key
+ripc update tls
 ```
 
 This moves the staged certificate into `server.tls`, where the server reads it.
@@ -185,17 +184,3 @@ Manually triggers an ACME certificate request or renewal process *outside* the f
 go run ./cmd/request-acme-cert -dbpath <path> -agekey <path>
 ```
 
-### `update-app-certificate`
-
-**Purpose**:  
-Moves the staged certificate from `acme.certificate`/`acme.private_key` into `server.tls.certificate`/`server.tls.private_key`.
-
-**Functionality**:  
-- Connects to the secure configuration store
-- Reads the staged pair from the `acme` section
-- Moves them into the server TLS settings
-
-**Usage**:  
-```bash
-go run ./cmd/update-app-certificate -dbpath <path> -agekey <path>
-```
